@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use poise::CreateReply;
 use rand::Rng;
 
+use crate::app_config::EmojiConfig;
 use crate::prelude::*;
 use crate::{commands::minigames::Minigame, event_handlers::message::update_activity};
 use judeharley::{
@@ -100,33 +101,33 @@ fn roll_over(mut roll: i32) -> i32 {
     roll
 }
 
-fn roll_to_emoji(roll: i32) -> String {
+fn roll_to_emoji(roll: i32, emoji: &EmojiConfig) -> String {
     // transform each digit into the dice emoji
     let hundreds = match roll / 100 {
-        1 => "1️⃣",
-        2 => "2️⃣",
-        3 => "3️⃣",
-        4 => "4️⃣",
-        5 => "5️⃣",
-        6 => "6️⃣",
+        1 => &emoji.d6_1,
+        2 => &emoji.d6_2,
+        3 => &emoji.d6_3,
+        4 => &emoji.d6_4,
+        5 => &emoji.d6_5,
+        6 => &emoji.d6_6,
         _ => unreachable!(),
     };
     let tens = match (roll % 100) / 10 {
-        1 => "1️⃣",
-        2 => "2️⃣",
-        3 => "3️⃣",
-        4 => "4️⃣",
-        5 => "5️⃣",
-        6 => "6️⃣",
+        1 => &emoji.d6_1,
+        2 => &emoji.d6_2,
+        3 => &emoji.d6_3,
+        4 => &emoji.d6_4,
+        5 => &emoji.d6_5,
+        6 => &emoji.d6_6,
         _ => unreachable!(),
     };
     let ones = match roll % 10 {
-        1 => "1️⃣",
-        2 => "2️⃣",
-        3 => "3️⃣",
-        4 => "4️⃣",
-        5 => "5️⃣",
-        6 => "6️⃣",
+        1 => &emoji.d6_1,
+        2 => &emoji.d6_2,
+        3 => &emoji.d6_3,
+        4 => &emoji.d6_4,
+        5 => &emoji.d6_5,
+        6 => &emoji.d6_6,
         _ => unreachable!(),
     };
 
@@ -137,6 +138,7 @@ fn roll_to_emoji(roll: i32) -> String {
 #[poise::command(slash_command, rename = "rolldice", guild_only)]
 pub async fn roll_dice(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     let data = ctx.data();
+    let emoji_config = &data.emoji;
 
     if let Some(guild_id) = ctx.guild_id() {
         update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
@@ -192,9 +194,9 @@ pub async fn roll_dice(ctx: ApplicationContext<'_>) -> Result<(), Error> {
                     r#"You rolled {} and won {total_winnings} Boondollars!
 
                             Additionally, you rolled the quest roll of {}! The next number is {}"#,
-                    roll_to_emoji(game.player_roll()),
-                    roll_to_emoji(old_roll),
-                    roll_to_emoji(guild_config.dice_roll)
+                    roll_to_emoji(game.player_roll(), emoji_config),
+                    roll_to_emoji(old_roll, emoji_config),
+                    roll_to_emoji(guild_config.dice_roll, emoji_config)
                 ))),
             )
             .await?;
@@ -208,29 +210,20 @@ pub async fn roll_dice(ctx: ApplicationContext<'_>) -> Result<(), Error> {
                     r#"You rolled {} and won {total_winnings} Boondollars!
 
                             The quest roll is {}"#,
-                    roll_to_emoji(game.player_roll()),
-                    roll_to_emoji(guild_config.dice_roll)
+                    roll_to_emoji(game.player_roll(), emoji_config),
+                    roll_to_emoji(guild_config.dice_roll, emoji_config)
                 ))),
             )
             .await?;
         }
         DiceRollResult::Lose => {
-            // m.embed(|x| {
-            //     x.title("You lost!").description(format!(
-            //         r#"You rolled {} and lost 5 Boondollars!
-
-            //     The quest roll is {}"#,
-            //         roll_to_emoji(game.player_roll()),
-            //         roll_to_emoji(guild_config.dice_roll)
-            //     ))
-            // })
             ctx.send(
                 CreateReply::default().embed(DiceRoll::prepare_embed().description(format!(
                     r#"You rolled {} and lost 5 Boondollars!
 
                     The quest roll is {}"#,
-                    roll_to_emoji(game.player_roll()),
-                    roll_to_emoji(guild_config.dice_roll)
+                    roll_to_emoji(game.player_roll(), emoji_config),
+                    roll_to_emoji(guild_config.dice_roll, emoji_config)
                 ))),
             )
             .await?;
