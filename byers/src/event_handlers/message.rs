@@ -32,7 +32,7 @@ impl UserMessageHandlerExt for DbUser {
     }
 
     fn user_id(&self) -> serenity::UserId {
-        serenity::UserId(self.id as u64)
+        serenity::UserId::new(self.id as u64)
     }
 
     async fn update_watched_time(&mut self, db: &PgPool) -> Result<(), Error> {
@@ -106,11 +106,14 @@ pub async fn update_activity(
     channel_id: ChannelId,
     guild_id: GuildId,
 ) -> Result<(), Error> {
-    let Some(channel_config) = DbServerChannelConfig::fetch(&data.db, channel_id.0 as i64, guild_id.0 as i64).await? else {
+    let Some(channel_config) =
+        DbServerChannelConfig::fetch(&data.db, channel_id.get() as i64, guild_id.get() as i64)
+            .await?
+    else {
         return Ok(());
     };
 
-    let mut user = DbUser::fetch_or_insert(&data.db, author.0 as i64).await?;
+    let mut user = DbUser::fetch_or_insert(&data.db, author.get() as i64).await?;
 
     if channel_config.allow_watch_time_accumulation {
         user.update_watched_time(&data.db).await?;

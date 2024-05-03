@@ -15,9 +15,9 @@ FROM chef AS builder
 
 ENV SQLX_OFFLINE=true
 
-COPY --from=planner /app/recipe.json recipe.json
-
 RUN apt update && apt install -y libavutil-dev libavformat-dev libavfilter-dev libclang-dev
+
+COPY --from=planner /app/recipe.json recipe.json
 
 RUN cargo chef cook --workspace --release --recipe-path recipe.json
 COPY Cargo.toml .

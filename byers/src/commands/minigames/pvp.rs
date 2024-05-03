@@ -1,7 +1,11 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
-use poise::serenity_prelude::{ButtonStyle, InteractionResponseType, User};
+use poise::serenity_prelude::{
+    ButtonStyle, CreateActionRow, CreateButton, CreateInteractionResponse,
+    CreateInteractionResponseMessage, Mentionable, User,
+};
+use poise::CreateReply;
 use rand::{distributions::Standard, prelude::Distribution};
 
 use crate::prelude::*;
@@ -51,22 +55,24 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
         update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
     }
 
-    let mut challenger = DbUser::fetch_or_insert(&data.db, ctx.author().id.0 as i64).await?;
-    let mut challenged = DbUser::fetch_or_insert(&data.db, user.id.0 as i64).await?;
+    let mut challenger = DbUser::fetch_or_insert(&data.db, ctx.author().id.get() as i64).await?;
+    let mut challenged = DbUser::fetch_or_insert(&data.db, user.id.get() as i64).await?;
     let mut server_config =
-        DbServerConfig::fetch_or_insert(&data.db, ctx.guild_id().unwrap().0 as i64).await?;
+        DbServerConfig::fetch_or_insert(&data.db, ctx.guild_id().unwrap().get() as i64).await?;
 
     let challenger_key = UserCooldownKey::new(challenger.id, "pvp");
     let challenged_key = UserCooldownKey::new(challenged.id, "pvp");
     if let Some(over) = is_on_cooldown(&data.redis_pool, challenger_key).await? {
-        ctx.send(|m| {
-            m.embed(|e| {
-                PvP::prepare_embed(e).description(format!(
-                    "You need to rest! You can challenge someone again {}.",
-                    over.relative_time(),
-                ))
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(
+                PvP::prepare_embed()
+                    .description(format!(
+                        "You need to rest! You can challenge someone again {}.",
+                        over.relative_time(),
+                    ))
+                    .to_owned(),
+            ),
+        )
         .await?;
         return Ok(());
     }
@@ -75,27 +81,33 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
         let bot_won = rand::random::<f64>() < 0.9;
 
         if bot_won {
-            ctx.send(|m| {
-                m.embed(|e| {
-                    PvP::prepare_embed(e)
-                        .description(format!("Byers wiped the floor with {}! They will need to rest for at least 10 minutes! Additionally, Byers took your lunch money of 10 Boondollars!", ctx.author()))
-                })
-            })
+            ctx.send(
+                CreateReply::default()
+                    .embed(
+                        PvP::prepare_embed()
+                            .description(format!(
+                                "Byers wiped the floor with {}! They will need to rest for at least 10 minutes! Additionally, Byers took your lunch money of 10 Boondollars!",
+                                ctx.author()
+                            ))
+                    )
+            )
             .await?;
             set_cooldown(&data.redis_pool, challenger_key, 10 * 60).await?;
 
             challenger.boonbucks -= 10.min(challenger.boonbucks);
             server_config.slot_jackpot += 10.min(challenger.boonbucks);
         } else {
-            ctx.send(|m| {
-                m.embed(|e| {
-                    PvP::prepare_embed(e).description(format!(
-                        "Against all odds, {} came out victorious against Byers! You received Byers' collected lunch money of {} Boondollars!",
-                        ctx.author(),
-                        server_config.slot_jackpot,
-                    ))
-                })
-            })
+            ctx.send(
+                CreateReply::default()
+                    .embed(
+                        PvP::prepare_embed()
+                            .description(format!(
+                                "Against all odds, {} came out victorious against Byers! You received Byers' collected lunch money of {} Boondollars!",
+                                ctx.author(),
+                                server_config.slot_jackpot
+                            ))
+                    )
+            )
             .await?;
             set_cooldown(&data.redis_pool, challenger_key, 5 * 60).await?;
 
@@ -110,105 +122,95 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
     }
 
     if challenger.id == challenged.id {
-        ctx.send(|m| {
-            m.embed(|e| {
-                PvP::prepare_embed(e).description("You can't challenge yourself to a duel!")
-            })
-        })
+        ctx.send(
+            CreateReply::default()
+                .embed(PvP::prepare_embed().description("You can't challenge yourself to a duel!")),
+        )
         .await?;
         return Ok(());
     }
 
     if challenger.boonbucks < 10 {
-        ctx.send(|m| {
-            m.embed(|e| {
-                PvP::prepare_embed(e)
-                    .description("You don't have enough Boondollars to challenge someone!")
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(
+                PvP::prepare_embed()
+                    .description("You don't have enough Boondollars to challenge someone!"),
+            ),
+        )
         .await?;
         return Ok(());
     }
 
     if challenged.boonbucks < 10 {
-        ctx.send(|m| {
-            m.embed(|e| {
-                PvP::prepare_embed(e).description(format!(
-                    "{} doesn't have enough Boondollars to accept your challenge!",
-                    user.name,
-                ))
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(PvP::prepare_embed().description(format!(
+                "{} doesn't have enough Boondollars to accept your challenge!",
+                user.name
+            ))),
+        )
         .await?;
         return Ok(());
     }
 
     let handle = ctx
-        .send(|m| {
-            m.embed(|e| {
-                PvP::prepare_embed(e).description(format!(
+        .send(
+            CreateReply::default()
+                .embed(PvP::prepare_embed().description(format!(
                     "{} challenged {} to a duel! Do you accept?\n\nYou have 60 seconds to respond.",
-                    ctx.author(),
-                    user,
-                ))
-            })
-            .components(|c| {
-                c.create_action_row(|r| {
-                    r.create_button(|b| {
-                        b.label("Accept")
-                            .style(ButtonStyle::Success)
-                            .emoji('✅')
-                            .custom_id(format!("pvp_accept_{}", challenger.id))
-                    })
-                    .create_button(|b| {
-                        b.label("Decline")
-                            .style(ButtonStyle::Danger)
-                            .emoji('❌')
-                            .custom_id(format!("pvp_decline_{}", challenger.id))
-                    })
-                })
-            })
-        })
+                    ctx.author().mention(),
+                    user
+                )))
+                .components(vec![CreateActionRow::Buttons(vec![
+                    CreateButton::new(format!("pvp_accept_{}", challenger.id))
+                        .label("Accept")
+                        .style(ButtonStyle::Success)
+                        .emoji('✅'),
+                    CreateButton::new(format!("pvp_decline_{}", challenger.id))
+                        .label("Decline")
+                        .style(ButtonStyle::Danger)
+                        .emoji('❌'),
+                ])]),
+        )
         .await?;
     let message = handle.message().await?;
     let Some(mci) = message
         .await_component_interaction(ctx.serenity_context())
-        .author_id(challenged.id as u64)
+        .author_id((challenged.id as u64).into())
         .channel_id(message.channel_id)
         .timeout(Duration::from_secs(60))
         .filter(move |mci| {
             mci.data.custom_id == format!("pvp_accept_{}", challenger.id)
                 || mci.data.custom_id == format!("pvp_decline_{}", challenger.id)
         })
-        .await else {
+        .await
+    else {
         handle
-            .edit(poise::Context::Application(ctx), |r| {
-                r.embed(|e| {
-                    PvP::prepare_embed(e).description(format!(
+            .edit(
+                poise::Context::Application(ctx),
+                CreateReply::default()
+                    .embed(PvP::prepare_embed().description(format!(
                         "{} challenged {} to a duel and they didn't respond in time!",
                         ctx.author().name,
                         user.name,
-                    ))
-                })
-                .components(|c| c)
-            })
+                    )))
+                    .components(vec![]),
+            )
             .await?;
         return Ok(());
     };
     if mci.data.custom_id != format!("pvp_accept_{}", challenger.id) {
-        mci.create_interaction_response(ctx.serenity_context(), |r| {
-            r.kind(InteractionResponseType::UpdateMessage)
-                .interaction_response_data(|d| {
-                    d.embed(|e| {
-                        PvP::prepare_embed(e).description(format!(
-                            "{} challenged {} to a duel and they declined!",
-                            ctx.author().name,
-                            user.name,
-                        ))
-                    })
-                    .components(|c| c)
-                })
-        })
+        mci.create_response(
+            ctx.serenity_context(),
+            CreateInteractionResponse::UpdateMessage(
+                CreateInteractionResponseMessage::new()
+                    .embed(PvP::prepare_embed().description(format!(
+                        "{} challenged {} to a duel and they declined!",
+                        ctx.author().name,
+                        user.name,
+                    )))
+                    .components(vec![]),
+            ),
+        )
         .await?;
         return Ok(());
     }
@@ -217,28 +219,26 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
     // The two warriors face each other, from opposite ends of the colosseum. The crowd roars... The wind is howling... Somewhere, a clock ticks, and the fate of our heroes hangs in the balance. FIGHT!
     // The wind picks up, consuming the colosseum in a wild sandstorm.
     // The dust settles and {player1/player2} emerges victorious!
-    mci.create_interaction_response(ctx.serenity_context(), |r| {
-        r.kind(InteractionResponseType::UpdateMessage)
-            .interaction_response_data(|m| {
-                m.embed(|e| {
-                    PvP::prepare_embed(e).description(format!(
-                        "{} accepted {}'s challenge!",
-                        user.name,
-                        ctx.author()
-                    ))
-                })
-                .components(|c| c)
-            })
-    })
+    mci.create_response(
+        ctx.serenity_context(),
+        CreateInteractionResponse::UpdateMessage(
+            CreateInteractionResponseMessage::new()
+                .embed(PvP::prepare_embed().description(format!(
+                    "{} accepted {}'s challenge!",
+                    user.name,
+                    ctx.author()
+                )))
+                .components(vec![]),
+        ),
+    )
     .await?;
     tokio::time::sleep(Duration::from_secs(5)).await;
     handle
-        .edit(poise::Context::Application(ctx), |m| {
-            m.embed(|e| {
-                PvP::prepare_embed(e)
-                    .description("The two warriors face each other, from opposite ends of the colosseum. The crowd roars... The wind is howling... Somewhere, a clock ticks, and the fate of our heroes hangs in the balance. FIGHT! Suddenly, the wind picks up, consuming the colosseum in a wild sandstorm.")
-            })
-        })
+        .edit(
+            poise::Context::Application(ctx),
+            CreateReply::default()
+                .embed(PvP::prepare_embed().description("The two warriors face each other, from opposite ends of the colosseum. The crowd roars... The wind is howling... Somewhere, a clock ticks, and the fate of our heroes hangs in the balance. FIGHT! Suddenly, the wind picks up, consuming the colosseum in a wild sandstorm.")),
+        )
         .await?;
 
     let game = PvP;
@@ -254,14 +254,13 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
             challenged.update(&data.db).await?;
 
             handle
-                .edit(poise::Context::Application(ctx), |m| {
-                    m.embed(|e| {
-                        PvP::prepare_embed(e).description(format!(
-                            "The dust settles and {} emerges victorious!",
-                            ctx.author().name,
-                        ))
-                    })
-                })
+                .edit(
+                    poise::Context::Application(ctx),
+                    CreateReply::default().embed(PvP::prepare_embed().description(format!(
+                        "The dust settles and {} emerged victorious!",
+                        ctx.author().name,
+                    ))),
+                )
                 .await?;
         }
         PvPResult::Player2 => {
@@ -271,14 +270,13 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
             challenger.update(&data.db).await?;
 
             handle
-                .edit(poise::Context::Application(ctx), |m| {
-                    m.embed(|e| {
-                        PvP::prepare_embed(e).description(format!(
-                            "The dust settles and {} emerges victorious!",
-                            user.name,
-                        ))
-                    })
-                })
+                .edit(
+                    poise::Context::Application(ctx),
+                    CreateReply::default().embed(PvP::prepare_embed().description(format!(
+                        "The dust settles and {} emerged victorious!",
+                        user.name
+                    ))),
+                )
                 .await?;
         }
     }

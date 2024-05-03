@@ -22,7 +22,7 @@ use tokio::sync::oneshot::Receiver;
 use tracing::error;
 use tracing_unwrap::ResultExt;
 
-use crate::{app_config::DiscordConfig, commands::songs, prelude::Error};
+use crate::{app_config::DiscordConfig, prelude::Error};
 
 static OAUTH2_SUCCESS_HTML: &str = include_str!("static/oauth2_success.html");
 static OAUTH2_FAILED_CSRF_HTML: &str = include_str!("static/oauth2_csrf.html");

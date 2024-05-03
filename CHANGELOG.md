@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning].
 - Added `/config delete_role_config` for removing rules for automatically assigning roles.
   - This does NOT delete the role!
 - Added `/admin song_info` for getting information about a song.
+- Added `/admin generate_playlist` to regenerate the playlist for Liquidsoap.
+  - Liquidsoap will automatically reload the playlist once it's changed
 - Added changelog comparison links to the changelog
 - Added functionality for frohike to drop indices on moved and deleted directories
 - Added bitrate to song metadata
@@ -32,12 +34,21 @@ and this project adheres to [Semantic Versioning].
 - Changed "Can Town" to "Can City" and added more names based on the can count
 - Changed `/boondollars` to show hours in increments of 5 minutes
 - Changed `/pvp` to only draw as much money as the challenger has when fighting Byers (so you can't lose more than you have)
+- `/pvp` now pings the challenged person
+- Renamed `/minigames roll_dice` to `/minigames rolldice`
+- Renamed `/pay` to `/give`
+- Changed Liquidsoap's playlist to use a dedicated playlist file
+  - Previously this could cause PNG files to be "played" as videos
 - Updated sqlx to 0.7.1
+- Updated poise to 0.6
 
 ### Fixed
 
 - Fixed frohike not being able to drop indices on moved directories
 - Fixed `/addcan` not returning any message when it's on cooldown
+- Fixed multiple issues with frohike's automatic indexing
+  - Only audio files will be indexed now
+  - Switched from inotify to polling to improve index accuracy
 
 ## [1.1.9] - 2023-10-06
 

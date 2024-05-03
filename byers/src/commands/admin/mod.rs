@@ -1,5 +1,5 @@
 use crate::commands::admin::control::{
-    control_cmd, queue, reconnect, reindex, skip, song_info, volume,
+    control_cmd, generate_playlist, queue, reconnect, reindex, skip, song_info, song_tag, volume,
 };
 
 use crate::commands::admin::import::import_manually;
@@ -23,7 +23,9 @@ pub mod user;
         "reconnect",
         "song_info",
         "import_manually",
-        "reindex"
+        "reindex",
+        "generate_playlist",
+        "song_tag",
     ),
     subcommand_required
 )]

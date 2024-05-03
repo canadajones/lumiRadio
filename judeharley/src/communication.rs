@@ -17,6 +17,7 @@ pub struct QueueItem {
 #[async_trait::async_trait]
 pub trait LiquidsoapCommunication {
     type Error;
+    #[deprecated]
     async fn send(&mut self, command: &str) -> Result<(), Self::Error>;
     async fn send_wait(&mut self, command: &str) -> Result<String, Self::Error>;
     async fn song_requests(&mut self) -> Result<Vec<QueueItem>, Self::Error>;
@@ -151,6 +152,7 @@ impl LiquidsoapCommunication for ByersUnixStream {
         result.map_err(Into::into)
     }
 
+    #[allow(deprecated)]
     async fn send(&mut self, command: &str) -> Result<(), Self::Error> {
         let result = self.write_line(command).await;
 

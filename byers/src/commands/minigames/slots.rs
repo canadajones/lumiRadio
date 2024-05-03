@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
+use poise::CreateReply;
 use rand::seq::IteratorRandom;
 use strum::IntoEnumIterator;
 
@@ -138,31 +139,30 @@ pub async fn slots(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     let Some(guild_id) = ctx.guild_id() else {
         return Err(anyhow!("This command can only be used in a server"));
     };
-    let mut server_config = DbServerConfig::fetch_or_insert(&data.db, guild_id.0 as i64).await?;
+    let mut server_config =
+        DbServerConfig::fetch_or_insert(&data.db, guild_id.get() as i64).await?;
 
-    let user_cooldown = UserCooldownKey::new(ctx.author().id.0 as i64, "slots");
+    let user_cooldown = UserCooldownKey::new(ctx.author().id.get() as i64, "slots");
     if let Some(over) = is_on_cooldown(&data.redis_pool, user_cooldown).await? {
-        ctx.send(|m| {
-            m.embed(|e| {
-                SlotMachine::prepare_embed(e).description(format!(
-                    "The slot machine is broken. Come back {}.",
-                    over.relative_time(),
-                ))
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(SlotMachine::prepare_embed().description(format!(
+                "The slot machine is broken. Come back {}.",
+                over.relative_time(),
+            ))),
+        )
         .await?;
         return Ok(());
     }
 
-    let mut user = DbUser::fetch_or_insert(&data.db, ctx.author().id.0 as i64).await?;
+    let mut user = DbUser::fetch_or_insert(&data.db, ctx.author().id.get() as i64).await?;
     if user.boonbucks < 5 {
-        ctx.send(|m| {
-            m.embed(|e| {
-                SlotMachine::prepare_embed(e)
+        ctx.send(
+            CreateReply::default().embed(
+                SlotMachine::prepare_embed()
                     .description("You need at least 5 Boondollars to play slots")
-                    .color(0xFF0000)
-            })
-        })
+                    .color(0xFF0000),
+            ),
+        )
         .await?;
         return Ok(());
     }
@@ -189,9 +189,9 @@ pub async fn slots(ctx: ApplicationContext<'_>) -> Result<(), Error> {
         PayoutOptions::Nothing => {}
     }
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Slot Machine")
+    ctx.send(
+        CreateReply::default().embed(
+            SlotMachine::prepare_embed()
                 .description("You paid 5 Boondollars to play slots and got...")
                 .field(
                     "Rolls",
@@ -214,9 +214,9 @@ pub async fn slots(ctx: ApplicationContext<'_>) -> Result<(), Error> {
                     },
                     false,
                 )
-                .color(0x00FF00)
-        })
-    })
+                .color(0x00FF00),
+        ),
+    )
     .await?;
 
     set_cooldown(&data.redis_pool, user_cooldown, 5 * 60).await?;

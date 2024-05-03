@@ -1,5 +1,7 @@
-use poise::serenity_prelude::{Channel, ChannelId, Role, UserId};
-use serde::de;
+use poise::{
+    serenity_prelude::{Channel, CreateEmbed, Role, UserId},
+    CreateReply,
+};
 
 use crate::prelude::*;
 use judeharley::db::{DbCan, DbServerChannelConfig, DbServerConfig, DbServerRoleConfig, DbUser};
@@ -27,14 +29,15 @@ pub async fn config(_: ApplicationContext<'_>) -> Result<(), Error> {
 pub async fn set_can_count(ctx: ApplicationContext<'_>, can_count: i32) -> Result<(), Error> {
     let data = ctx.data;
 
-    DbCan::set(&data.db, ctx.author().id.0 as i64, can_count).await?;
+    DbCan::set(&data.db, ctx.author().id.get() as i64, can_count).await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Can Count Set")
-                .description(format!("Can count set to {}", can_count))
-        })
-    })
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Can Count Set")
+                .description(format!("Can count set to {}", can_count)),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -46,16 +49,17 @@ pub async fn set_quest_roll(ctx: ApplicationContext<'_>, roll: i32) -> Result<()
     let data = ctx.data;
 
     let mut server_config =
-        DbServerConfig::fetch_or_insert(&data.db, ctx.guild_id().unwrap().0 as i64).await?;
+        DbServerConfig::fetch_or_insert(&data.db, ctx.guild_id().unwrap().get() as i64).await?;
     server_config.dice_roll = roll;
     server_config.update(&data.db).await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Quest Roll Set")
-                .description(format!("Quest roll set to {}", roll))
-        })
-    })
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Quest Roll Set")
+                .description(format!("Quest roll set to {}", roll)),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -73,22 +77,24 @@ pub async fn manage_role(
     let data = ctx.data;
     let guild_id = ctx.guild_id().unwrap();
 
-    DbServerRoleConfig::upsert(&data.db, guild_id.0 as i64, role.id.0 as i64, hours).await?;
+    DbServerRoleConfig::upsert(&data.db, guild_id.get() as i64, role.id.get() as i64, hours)
+        .await?;
     let handle = ctx
-        .send(|m| {
-            m.embed(|e| {
-                e.title("Role Configured")
+        .send(
+            CreateReply::default().embed(
+                CreateEmbed::new()
+                    .title("Role Configured")
                     .description("Applying the roles for all users...")
                     .field("Role", &role.name, true)
-                    .field("Minimum watch time", format!("{} hours", hours), true)
-            })
-        })
+                    .field("Minimum watch time", format!("{} hours", hours), true),
+            ),
+        )
         .await?;
 
     let users = DbUser::fetch_by_minimum_hours(&data.db, hours).await?;
     for user in users {
-        let user_id = UserId(user.id as u64);
-        let mut member = guild_id.member(&ctx.serenity_context(), user_id).await?;
+        let user_id = UserId::new(user.id as u64);
+        let member = guild_id.member(&ctx.serenity_context(), user_id).await?;
         if member.roles.contains(&role.id) {
             continue;
         }
@@ -99,14 +105,16 @@ pub async fn manage_role(
     }
 
     handle
-        .edit(poise::Context::Application(ctx), |m| {
-            m.embed(|e| {
-                e.title("Role Configured")
+        .edit(
+            poise::Context::Application(ctx),
+            CreateReply::default().embed(
+                CreateEmbed::new()
+                    .title("Role Configured")
                     .description("All users have been updated")
                     .field("Role", &role.name, true)
-                    .field("Minimum watch time", format!("{} hours", hours), true)
-            })
-        })
+                    .field("Minimum watch time", format!("{} hours", hours), true),
+            ),
+        )
         .await?;
 
     Ok(())
@@ -120,14 +128,16 @@ pub async fn delete_role_config(
     let data = ctx.data;
     let guild_id = ctx.guild_id().unwrap();
 
-    DbServerRoleConfig::delete_by_guild_role(&data.db, guild_id.0 as i64, role.id.0 as i64).await?;
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Role Config Deleted")
+    DbServerRoleConfig::delete_by_guild_role(&data.db, guild_id.get() as i64, role.id.get() as i64)
+        .await?;
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Role Config Deleted")
                 .description("The role config has been deleted")
-                .field("Role", &role.name, true)
-        })
-    })
+                .field("Role", &role.name, true),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -146,8 +156,8 @@ pub async fn manage_channel(
 
     let mut channel_config = DbServerChannelConfig::fetch_or_insert(
         &data.db,
-        channel.id().0 as i64,
-        ctx.guild_id().unwrap().0 as i64,
+        channel.id().get() as i64,
+        ctx.guild_id().unwrap().get() as i64,
     )
     .await?;
     channel_config.allow_point_accumulation = allow_point_accumulation;
@@ -155,9 +165,10 @@ pub async fn manage_channel(
     channel_config.hydration_reminder = hydration_reminder;
     channel_config.update(&data.db).await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Channel Configured")
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Channel Configured")
                 .field(
                     "Allow point accumulation",
                     allow_point_accumulation.to_string(),
@@ -172,9 +183,9 @@ pub async fn manage_channel(
                     "Remind people to hydrate",
                     hydration_reminder.to_string(),
                     true,
-                )
-        })
-    })
+                ),
+        ),
+    )
     .await?;
 
     Ok(())

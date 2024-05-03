@@ -1,6 +1,9 @@
+use std::path::PathBuf;
+
 use crate::commands::autocomplete_songs;
 use crate::prelude::*;
 use judeharley::{communication::LiquidsoapCommunication, db::DbSong};
+use poise::{serenity_prelude::CreateEmbed, CreateReply};
 
 /// Reconnects the Liquidsoap command socket
 #[poise::command(slash_command, ephemeral, owners_only)]
@@ -8,7 +11,8 @@ pub async fn reconnect(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     let mut comms = ctx.data.comms.lock().await;
 
     comms.reconnect().await?;
-    ctx.send(|m| m.content("Reconnected to Liquidsoap")).await?;
+    ctx.send(CreateReply::default().content("Reconnected to Liquidsoap"))
+        .await?;
 
     Ok(())
 }
@@ -17,13 +21,35 @@ pub async fn reconnect(ctx: ApplicationContext<'_>) -> Result<(), Error> {
 #[poise::command(slash_command, ephemeral, owners_only)]
 pub async fn reindex(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     let data = ctx.data;
-    let mut comms = ctx.data.comms.lock().await;
+    // let mut comms = ctx.data.comms.lock().await;
 
     ctx.defer_ephemeral().await?;
     judeharley::maintenance::indexing::index(data.db.clone(), "/music".into()).await?;
-    comms.send("music.reload").await?;
-    ctx.send(|m| m.content("Reindexed the song database."))
-        .await?;
+    let playlist_path = PathBuf::from("/music/playlist.m3u");
+    judeharley::maintenance::indexing::create_playlist(data.db.clone(), &playlist_path).await?;
+    // comms.send_wait("music.reload").await?;
+    ctx.send(
+        CreateReply::default().content("Reindexed the song database and reloaded the playlist."),
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Generates a playlist file from the database
+#[poise::command(slash_command, ephemeral, owners_only)]
+pub async fn generate_playlist(ctx: ApplicationContext<'_>) -> Result<(), Error> {
+    let data = ctx.data;
+
+    let playlist_path = PathBuf::from("/music/playlist.m3u");
+    judeharley::maintenance::indexing::create_playlist(data.db.clone(), &playlist_path).await?;
+
+    ctx.send(
+        CreateReply::default().content(
+            "Regenerated the playlist. It should automatically be loaded into Liquidsoap!",
+        ),
+    )
+    .await?;
 
     Ok(())
 }
@@ -38,13 +64,14 @@ pub async fn control_cmd(
 
     let mut response = comms.send_wait(&command).await?.trim().to_string();
     response.truncate(2000);
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Command Response")
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Command Response")
                 .description(format!("```\n{}\n```", response))
-                .field("Command", command, false)
-        })
-    })
+                .field("Command", command, false),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -62,14 +89,15 @@ pub async fn song_info(
     let data = ctx.data;
 
     let Some(song) = DbSong::fetch_from_hash(&data.db, &song).await? else {
-        ctx.send(|m| m.content("Song not found.")).await?;
+        ctx.send(CreateReply::default().content("Song not found."))
+            .await?;
         return Ok(());
     };
 
     let tags = song.tags(&data.db).await?;
     let tags_str = tags
         .into_iter()
-        .map(|t| format!("{} = {}", t.0, t.1))
+        .map(|(k, _)| k)
         .collect::<Vec<_>>()
         .join(", ");
     // take 1024 characters or, if longer, 1021 characters and add ...
@@ -79,22 +107,68 @@ pub async fn song_info(
         tags_str
     };
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Song Info")
-                .description(format!(
-                    "The song {} - {} has the following information:",
-                    &song.artist, &song.title
-                ))
-                .field("Title", &song.title, true)
-                .field("Artist", &song.artist, true)
-                .field("Album", &song.album, true)
-                .field("Bitrate", song.bitrate, true)
-                .field("File Path", &song.file_path, true)
-                .field("ID", &song.file_hash, true)
-                .field("Tags", &tags_str, true)
-        })
-    })
+    ctx.send(
+        CreateReply::default()
+            .embed(
+                CreateEmbed::new()
+                    .title("Song Info")
+                    .description(format!(
+                        "The song {} - {} has the following information:",
+                        &song.artist, &song.title
+                    ))
+                    .field("Title", &song.title, true)
+                    .field("Artist", &song.artist, true)
+                    .field("Album", &song.album, true)
+                    .field("Bitrate", song.bitrate.to_string(), true)
+                    .field("File Path", &song.file_path, true)
+                    .field("ID", &song.file_hash, true)
+                    .field("Tags", &tags_str, true),
+            )
+            .ephemeral(true),
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Queries a tag on the specific song
+#[poise::command(slash_command, ephemeral, owners_only)]
+pub async fn song_tag(
+    ctx: ApplicationContext<'_>,
+    #[description = "Song to get info about"]
+    #[autocomplete = "autocomplete_songs"]
+    song: String,
+    #[description = "Tag to query"] tag: String,
+) -> Result<(), Error> {
+    let data = ctx.data;
+
+    let Some(song) = DbSong::fetch_from_hash(&data.db, &song).await? else {
+        ctx.send(CreateReply::default().content("Song not found."))
+            .await?;
+        return Ok(());
+    };
+
+    let tag_value = song.tag(&tag, &data.db).await?;
+    let Some(tag_value) = tag_value else {
+        ctx.send(CreateReply::default().content("Tag not found."))
+            .await?;
+        return Ok(());
+    };
+
+    ctx.send(
+        CreateReply::default()
+            .embed(
+                CreateEmbed::new()
+                    .title("Song Info")
+                    .description(format!(
+                        "The song {} - {} has the following information:",
+                        &song.artist, &song.title
+                    ))
+                    .field("Tag", &tag, true)
+                    .field("Value", &tag_value, true),
+            )
+            .ephemeral(true),
+    )
     .await?;
 
     Ok(())
@@ -114,12 +188,13 @@ pub async fn volume(
     let Some(volume) = volume else {
         let set_volume = comms.send_wait("var.get volume").await?;
         let set_volume = set_volume.trim().parse::<f32>().unwrap_or(0.0);
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title("Volume")
-                    .description(format!("Volume is set to {}%", (set_volume * 100.0) as i32))
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(
+                CreateEmbed::new()
+                    .title("Volume")
+                    .description(format!("Volume is set to {}%", (set_volume * 100.0) as i32)),
+            ),
+        )
         .await?;
         return Ok(());
     };
@@ -128,12 +203,13 @@ pub async fn volume(
         .send_wait(&format!("var.set volume {}", volume as f32 / 100.0))
         .await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Volume Set")
-                .description(format!("Volume set to {}%", volume))
-        })
-    })
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Volume Set")
+                .description(format!("Volume set to {}%", volume)),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -146,8 +222,14 @@ pub async fn pause(ctx: ApplicationContext<'_>) -> Result<(), Error> {
 
     let _ = comms.send_wait("lumiradio.pause").await?;
 
-    ctx.send(|m| m.embed(|e| e.title("Paused").description("Paused the radio")))
-        .await?;
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Radio Paused")
+                .description("The radio has been paused"),
+        ),
+    )
+    .await?;
 
     Ok(())
 }
@@ -163,7 +245,8 @@ pub async fn queue(
 ) -> Result<(), Error> {
     let data = ctx.data;
     let Some(song) = DbSong::fetch_from_hash(&ctx.data.db, &song).await? else {
-        ctx.send(|m| m.content("Song not found.")).await?;
+        ctx.send(CreateReply::default().content("Song not found."))
+            .await?;
         return Ok(());
     };
 
@@ -171,15 +254,21 @@ pub async fn queue(
         let mut comms = data.comms.lock().await;
         comms.priority_request(&song.file_path).await?;
     }
-    song.request(&data.db, ctx.author().id.0).await?;
+    song.request(&data.db, ctx.author().id.get()).await?;
 
-    ctx.send(|m| m.embed(|e| e.title("Song Queued").description(format!("Queued {song}"))))
-        .await?;
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Song Queued")
+                .description(format!("Queued {song}")),
+        ),
+    )
+    .await?;
 
     Ok(())
 }
 
-#[derive(Debug, poise::ChoiceParameter)]
+#[derive(Debug, poise::ChoiceParameter, strum::Display)]
 pub enum SkipType {
     #[name = "The current song"]
     Radio,
@@ -205,12 +294,13 @@ pub async fn skip(
 
     let _ = comms.send_wait(command).await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Skipped")
-                .description(format!("Skipped {}", skip_type))
-        })
-    })
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Skipped")
+                .description(format!("Skipped {}", skip_type)),
+        ),
+    )
     .await?;
 
     Ok(())

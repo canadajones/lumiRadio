@@ -1,4 +1,5 @@
 use judeharley::db::DbSong;
+use poise::{serenity_prelude::CreateEmbed, CreateReply};
 use tracing_unwrap::ResultExt;
 
 use crate::prelude::{ApplicationContext, Error};
@@ -14,24 +15,32 @@ pub async fn what_song(
         .await
         .expect_or_log("Failed to query database");
     let Some(song) = song else {
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title("No song found")
-                    .description("No song was found playing at that time")
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(CreateEmbed::new().title("No song found").description(
+                format!(
+                    "No song was found playing at [that]({}) time",
+                    message.link()
+                ),
+            )),
+        )
         .await?;
         return Ok(());
     };
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Song found").description(format!(
-                "The song playing at that time was **{} - {}**.",
-                song.album, song.title
-            ))
-        })
-    })
+    // m.embed(|e| {
+    //     e.title("Song found").description(format!(
+    //         "The song playing at that time was **{} - {}**.",
+    //         song.album, song.title
+    //     ))
+    // })
+    ctx.send(
+        CreateReply::default().embed(CreateEmbed::new().title("Song found").description(format!(
+            "The song playing at [that]({}) time was **{} - {}**.",
+            message.link(),
+            song.album,
+            song.title
+        ))),
+    )
     .await?;
 
     Ok(())

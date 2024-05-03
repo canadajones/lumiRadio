@@ -1,6 +1,9 @@
 use crate::prelude::*;
 use judeharley::{db::DbUser, BigDecimal};
-use poise::serenity_prelude::User;
+use poise::{
+    serenity_prelude::{CreateEmbed, User},
+    CreateReply,
+};
 
 /// User commands
 #[poise::command(
@@ -14,7 +17,7 @@ pub async fn user(_: ApplicationContext<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[derive(Debug, Clone, poise::ChoiceParameter)]
+#[derive(Debug, Clone, poise::ChoiceParameter, strum::Display)]
 pub enum UserParameter {
     #[name = "Watched time"]
     WatchedTime,
@@ -24,7 +27,7 @@ pub enum UserParameter {
     Migrated,
 }
 
-#[derive(Debug, Clone, poise::ChoiceParameter)]
+#[derive(Debug, Clone, poise::ChoiceParameter, strum::Display)]
 pub enum UserGristParameter {
     #[name = "Amber Grist"]
     Amber,
@@ -77,7 +80,7 @@ pub async fn get_grist(
 ) -> Result<(), Error> {
     let data = ctx.data();
 
-    let db_user = DbUser::fetch_or_insert(&data.db, user.id.0 as i64).await?;
+    let db_user = DbUser::fetch_or_insert(&data.db, user.id.get() as i64).await?;
     let value = match grist_type {
         UserGristParameter::Amber => db_user.amber.to_string(),
         UserGristParameter::Amethyst => db_user.amethyst.to_string(),
@@ -101,13 +104,14 @@ pub async fn get_grist(
         UserGristParameter::Zillium => db_user.zillium.to_string(),
     };
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title(format!("User {}", user.name))
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title(format!("User {}", user.name))
                 .field("Property", grist_type.to_string(), true)
-                .field("Value", value, true)
-        })
-    })
+                .field("Value", value, true),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -122,20 +126,21 @@ pub async fn get(
 ) -> Result<(), Error> {
     let data = ctx.data();
 
-    let db_user = DbUser::fetch_or_insert(&data.db, user.id.0 as i64).await?;
+    let db_user = DbUser::fetch_or_insert(&data.db, user.id.get() as i64).await?;
     let value = match property {
         UserParameter::WatchedTime => db_user.watched_time.to_string(),
         UserParameter::Boonbucks => db_user.boonbucks.to_string(),
         UserParameter::Migrated => db_user.migrated.to_string(),
     };
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title(format!("User {}", user.name))
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title(format!("User {}", user.name))
                 .field("Property", property.to_string(), true)
-                .field("Value", value, true)
-        })
-    })
+                .field("Value", value, true),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -151,7 +156,7 @@ pub async fn set_grist(
 ) -> Result<(), Error> {
     let data = ctx.data();
 
-    let mut db_user = DbUser::fetch_or_insert(&data.db, user.id.0 as i64).await?;
+    let mut db_user = DbUser::fetch_or_insert(&data.db, user.id.get() as i64).await?;
     match grist_type {
         UserGristParameter::Amber => {
             db_user.amber = value;
@@ -216,12 +221,13 @@ pub async fn set_grist(
     }
     db_user.update(&data.db).await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Successfully set user grist")
-                .description(format!("Successfully set {} to {}", grist_type, value))
-        })
-    })
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Successfully set user grist")
+                .description(format!("Successfully set {} to {}", grist_type, value)),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -237,7 +243,7 @@ pub async fn set(
 ) -> Result<(), Error> {
     let data = ctx.data();
 
-    let mut db_user = DbUser::fetch_or_insert(&data.db, user.id.0 as i64).await?;
+    let mut db_user = DbUser::fetch_or_insert(&data.db, user.id.get() as i64).await?;
     match property {
         UserParameter::WatchedTime => {
             db_user.watched_time = value.parse::<BigDecimal>()?;
@@ -251,12 +257,13 @@ pub async fn set(
     }
     db_user.update(&data.db).await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Successfully set user property")
-                .description(format!("Successfully set {} to {}", property, value))
-        })
-    })
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Successfully set user property")
+                .description(format!("Successfully set {} to {}", property, value)),
+        ),
+    )
     .await?;
 
     Ok(())

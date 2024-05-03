@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use audiotags::{AudioTagEdit, Id3v2Tag};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::{db::DbSong, maintenance::rewrite_music_path, prelude::*};
 
@@ -18,7 +18,7 @@ impl WavTag for Id3v2Tag {
     where
         Self: Sized,
     {
-        let id_tag = id3::Tag::read_from_wav_path(path)?;
+        let id_tag = id3::Tag::read_from_path(path)?;
 
         Ok(id_tag.into())
     }
@@ -31,11 +31,18 @@ pub async fn index(db: PgPool, directory: PathBuf) -> Result<()> {
 
     let files = walkdir::WalkDir::new(&directory)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            if let Err(e) = &e {
+                error!("Failed to walk directory: {}", e);
+                None
+            } else {
+                e.ok()
+            }
+        })
         .filter(|e| {
             e.file_type().is_file()
                 && e.path().extension().is_some()
-                && vec!["mp3", "flac", "ogg", "wav"].contains(
+                && SUPPORTED_AUDIO_FORMATS.contains(
                     &e.path()
                         .extension()
                         .unwrap()
@@ -46,6 +53,7 @@ pub async fn index(db: PgPool, directory: PathBuf) -> Result<()> {
         })
         .map(|e| e.path().to_owned())
         .collect::<Vec<_>>();
+    debug!("Found {} files", files.len());
 
     let len = files.len();
     let mut failed_files = vec![];
@@ -67,6 +75,17 @@ pub async fn index(db: PgPool, directory: PathBuf) -> Result<()> {
 
 #[tracing::instrument(skip(db))]
 pub async fn index_file(db: PgPool, path: &Path, music_path: &Path) -> Result<()> {
+    if !SUPPORTED_AUDIO_FORMATS.contains(
+        &path
+            .extension()
+            .unwrap()
+            .to_string_lossy()
+            .to_lowercase()
+            .as_str(),
+    ) {
+        return Ok(());
+    }
+
     let (title, artist, album) = {
         if path.extension().unwrap().to_ascii_lowercase() == "wav" {
             let tag = Id3v2Tag::read_from_wav_path(path)?;
@@ -85,11 +104,8 @@ pub async fn index_file(db: PgPool, path: &Path, music_path: &Path) -> Result<()
             )
         }
     };
-    let meta = metadata::media_file::MediaFileMetadata::new(&path)?;
-    let duration = meta._duration.unwrap_or(0_f64);
-    let bitrate = meta
-        ._bit_rate
-        .unwrap_or((meta.file_size * 8) / duration as u64);
+    // let meta = metadata::media_file::MediaFileMetadata::new(&path)?;
+    let meta = super::metadata::MusicMetadata::new(&path)?;
 
     let mut hasher: Sha256 = Digest::new();
     hasher.update(path.canonicalize()?.to_string_lossy().as_bytes());
@@ -108,9 +124,9 @@ pub async fn index_file(db: PgPool, path: &Path, music_path: &Path) -> Result<()
         artist: artist.replace(char::from(0), ""),
         album: album.replace(char::from(0), ""),
         file_path: path.display().to_string(),
-        duration,
+        duration: meta.duration,
         file_hash: hash_str.clone(),
-        bitrate: bitrate as i32,
+        bitrate: meta.bitrate as i32,
     };
     new_song.insert(&db).await?;
 

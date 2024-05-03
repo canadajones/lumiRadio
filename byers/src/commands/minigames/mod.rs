@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::RwLock};
 
 use async_trait::async_trait;
 use chrono::Utc;
 use poise::{
     serenity_prelude::{CreateEmbed, Permissions},
-    Command,
+    Command, CooldownConfig,
 };
 
 use crate::prelude::*;
@@ -14,7 +14,6 @@ pub mod new_slots;
 pub mod pvp;
 pub mod roll_dice;
 pub mod slots;
-pub mod strife;
 
 #[async_trait]
 pub trait Minigame {
@@ -24,8 +23,8 @@ pub trait Minigame {
 
     async fn play(&self) -> Result<Self::MinigameResult, Error>;
 
-    fn prepare_embed(e: &mut CreateEmbed) -> &mut CreateEmbed {
-        e.title(Self::NAME).timestamp(Utc::now())
+    fn prepare_embed() -> CreateEmbed {
+        CreateEmbed::new().title(Self::NAME).timestamp(Utc::now())
     }
 
     fn command() -> Vec<poise::Command<Data<ByersUnixStream>, anyhow::Error>>;
@@ -36,7 +35,6 @@ pub fn commands() -> Vec<poise::Command<Data<ByersUnixStream>, anyhow::Error>> {
     commands.extend(pvp::PvP::command());
     commands.extend(roll_dice::DiceRoll::command());
     commands.extend(new_slots::NewSlots::command());
-    commands.extend(strife::Strife::command());
     commands
 }
 
@@ -57,13 +55,8 @@ pub fn command() -> Command<Data<ByersUnixStream>, Error> {
         description_localizations: HashMap::new(),
         help_text: None,
         hide_in_help: false,
-        cooldowns: std::sync::Mutex::new(poise::Cooldowns::new(poise::CooldownConfig {
-            global: None.map(std::time::Duration::from_secs),
-            user: None.map(std::time::Duration::from_secs),
-            guild: None.map(std::time::Duration::from_secs),
-            channel: None.map(std::time::Duration::from_secs),
-            member: None.map(std::time::Duration::from_secs),
-        })),
+        cooldown_config: RwLock::new(CooldownConfig::default()),
+        cooldowns: std::sync::Mutex::new(poise::Cooldowns::new()),
         reuse_response: false,
         default_member_permissions: Permissions::empty(),
         required_permissions: Permissions::empty(),
@@ -76,7 +69,7 @@ pub fn command() -> Command<Data<ByersUnixStream>, Error> {
         on_error: None,
         parameters: vec![],
         custom_data: Box::new(()),
-        aliases: &[],
+        aliases: vec![],
         invoke_on_edit: false,
         track_deletion: false,
         broadcast_typing: false,

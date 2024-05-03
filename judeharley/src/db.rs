@@ -55,7 +55,7 @@ impl DbSong {
     }
 
     pub async fn insert(&self, db: &PgPool) -> Result<(), JudeHarleyError> {
-        if let Some(_) = Self::fetch(db, &self.file_path).await? {
+        if (Self::fetch(db, &self.file_path).await?).is_some() {
             return Ok(());
         }
 
@@ -394,7 +394,7 @@ impl DbSong {
         let last_played = if let Some(last_played) = last_played {
             last_played.created_at
         } else {
-            chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap()
+            chrono::DateTime::from_timestamp(0, 0).unwrap().naive_utc()
         };
 
         Ok(last_played)
@@ -457,6 +457,22 @@ impl DbSong {
             .collect::<Vec<_>>();
 
         Ok(tags)
+    }
+
+    pub async fn tag(&self, tag: &str, db: &PgPool) -> Result<Option<String>, JudeHarleyError> {
+        let value = sqlx::query!(
+            r#"
+            SELECT value FROM song_tags
+            WHERE song_id = $1
+            AND tag = $2
+            "#,
+            self.file_hash,
+            tag
+        )
+        .fetch_optional(db)
+        .await?;
+
+        Ok(value.map(|v| v.value))
     }
 }
 
@@ -554,6 +570,79 @@ impl DbUser {
             id
         )
         .fetch_one(db)
+        .await
+        .map_err(Into::into)
+    }
+
+    pub async fn mark_as_favourite(
+        &self,
+        song_id: &str,
+        db: &sqlx::PgPool,
+    ) -> Result<(), JudeHarleyError> {
+        if DbSong::fetch_from_hash(db, song_id).await?.is_none() {
+            return Err(JudeHarleyError::SongNotFound);
+        }
+
+        let has_favourited = sqlx::query!(
+            r#"
+            SELECT 1 AS has_favourited FROM favourite_songs
+            WHERE user_id = $1 AND song_id = $2
+            "#,
+            self.id as i32,
+            song_id
+        )
+        .fetch_optional(db)
+        .await?
+        .is_some();
+
+        if has_favourited {
+            return Ok(());
+        }
+
+        sqlx::query!(
+            r#"
+            INSERT INTO favourite_songs (user_id, song_id)
+            VALUES ($1, $2)
+            "#,
+            self.id,
+            song_id
+        )
+        .execute(db)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn mark_as_unfavourited(
+        &self,
+        song_id: &str,
+        db: &sqlx::PgPool,
+    ) -> Result<(), JudeHarleyError> {
+        sqlx::query!(
+            r#"
+            DELETE FROM favourite_songs
+            WHERE user_id = $1 AND song_id = $2
+            "#,
+            self.id as i32,
+            song_id
+        )
+        .execute(db)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_favourites(&self, db: &sqlx::PgPool) -> Result<Vec<DbSong>, JudeHarleyError> {
+        sqlx::query_as!(
+            DbSong,
+            r#"
+            SELECT songs.title, songs.artist, songs.album, songs.file_path, songs.duration, songs.file_hash, songs.bitrate
+            FROM songs
+            JOIN favourite_songs fs ON fs.song_id = songs.file_hash
+            WHERE fs.user_id = $1
+            "#,
+            self.id
+        )
+        .fetch_all(db)
         .await
         .map_err(Into::into)
     }

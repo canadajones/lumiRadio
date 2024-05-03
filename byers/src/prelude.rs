@@ -15,9 +15,8 @@ lazy_static! {
         | GatewayIntents::GUILD_MEMBERS;
 }
 
-pub type Context<'a, C = ByersUnixStream> = poise::Context<'a, Data<C>, Error>;
-pub type ApplicationContext<'a, C = ByersUnixStream> =
-    poise::ApplicationContext<'a, Data<C>, Error>;
+pub type Context<'a> = poise::Context<'a, Data<ByersUnixStream>, Error>;
+pub type ApplicationContext<'a> = poise::ApplicationContext<'a, Data<ByersUnixStream>, Error>;
 pub type Error = anyhow::Error;
 
 pub struct Data<C>

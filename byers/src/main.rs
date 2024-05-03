@@ -1,4 +1,5 @@
 use fred::prelude::{ClientLike, PubsubInterface};
+use poise::serenity_prelude as serenity;
 use poise::PrefixFrameworkOptions;
 use tracing::{debug, info};
 use tracing_unwrap::ResultExt;
@@ -126,20 +127,20 @@ async fn main() {
         redis_subscriber: subscriber_client.clone(),
     };
 
-    let framework_builder = poise::Framework::builder()
+    let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands,
             event_handler: |ctx, event, _framework, data| {
                 Box::pin(async move {
-                    debug!("Event received: {}", event.name());
+                    debug!("Event received: {}", event.snake_case_name());
 
-                    if let poise::Event::Message { new_message } = event {
+                    if let serenity::FullEvent::Message { new_message } = event {
                         crate::event_handlers::message::message_handler(new_message, data)
                             .await
                             .expect_or_log("Failed to handle message");
                     }
 
-                    if let poise::Event::Ready { data_about_bot } = event {
+                    if let serenity::FullEvent::Ready { data_about_bot } = event {
                         crate::event_handlers::ready::on_ready(ctx, data_about_bot, data).await?;
                     }
 
@@ -161,8 +162,6 @@ async fn main() {
             },
             ..Default::default()
         })
-        .token(config.discord_token)
-        .intents(*INTENTS)
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
                 info!("Starting up Byers...");
@@ -170,9 +169,13 @@ async fn main() {
 
                 Ok(context)
             })
-        });
+        })
+        .build();
 
-    let framework = framework_builder.build().await.unwrap_or_log();
+    let mut client = serenity::ClientBuilder::new(&config.discord_token, *INTENTS)
+        .framework(framework)
+        .await
+        .expect_or_log("failed to create client");
 
     let (tx, rx) = tokio::sync::oneshot::channel::<()>();
     let webserver_handle = tokio::spawn(oauth2_server(
@@ -183,19 +186,19 @@ async fn main() {
         rx,
     ));
 
-    let shard_handler = framework.shard_manager().clone();
+    let shard_handler = client.shard_manager.clone();
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect_or_log("failed to install CTRL+C handler");
 
         info!("Shutting down...");
-        shard_handler.lock().await.shutdown_all().await;
+        shard_handler.shutdown_all().await;
         tx.send(()).expect_or_log("failed to send shutdown signal");
         let _ = webserver_handle.await;
     });
 
-    framework.start().await.unwrap_or_log();
+    client.start().await.expect_or_log("failed to start client");
 
     redis_pool.quit_pool().await;
     subscriber_client

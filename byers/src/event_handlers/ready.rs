@@ -1,5 +1,5 @@
 use fred::{prelude::PubsubInterface, types::RedisValue};
-use poise::serenity_prelude::{Activity, ChannelId};
+use poise::serenity_prelude::*;
 use tracing::{debug, info};
 use tracing_unwrap::ResultExt;
 
@@ -12,7 +12,7 @@ use judeharley::{
 async fn spawn_subscriber_handler(
     data: &Data<ByersUnixStream>,
     ctx: &poise::serenity_prelude::Context,
-) -> Result<(), Error> {
+) -> Result<(), crate::prelude::Error> {
     info!("Spawning Redis subscriber message handler...");
     let mut message_rx = data.redis_subscriber.on_message();
     let context = ctx.clone();
@@ -26,7 +26,7 @@ async fn spawn_subscriber_handler(
             match message.channel.to_string().as_str() {
                 "byers:status" => {
                     if let RedisValue::String(song) = message.value {
-                        context.set_activity(Activity::listening(song)).await;
+                        context.set_activity(Some(ActivityData::listening(song.to_string())));
                     }
                 }
                 "moo" => {}
@@ -42,7 +42,7 @@ pub async fn on_ready(
     ctx: &poise::serenity_prelude::Context,
     data_about_bot: &poise::serenity_prelude::Ready,
     data: &Data<ByersUnixStream>,
-) -> Result<(), Error> {
+) -> Result<(), crate::prelude::Error> {
     info!("Connected as {}", data_about_bot.user.name);
 
     spawn_subscriber_handler(data, ctx).await?;
@@ -51,11 +51,10 @@ pub async fn on_ready(
 
     let current_song = DbSong::last_played_song(&data.db).await;
     if let Ok(Some(current_song)) = current_song {
-        ctx.set_activity(Activity::listening(format!(
+        ctx.set_activity(Some(ActivityData::listening(format!(
             "{} - {}",
             current_song.album, current_song.title
-        )))
-        .await;
+        ))));
     }
 
     Ok(())
@@ -64,7 +63,7 @@ pub async fn on_ready(
 async fn spawn_hydration_reminder(
     data: &Data<ByersUnixStream>,
     ctx: &poise::serenity_prelude::Context,
-) -> Result<(), Error> {
+) -> Result<(), crate::prelude::Error> {
     let db = data.db.clone();
     let inner_ctx = ctx.clone();
 
@@ -82,14 +81,16 @@ async fn spawn_hydration_reminder(
                 .expect_or_log("Failed to fetch hydration channels");
 
             for channel in hydration_channels {
-                let discord_channel_id = ChannelId(channel.id as u64);
+                let discord_channel_id = ChannelId::new(channel.id as u64);
                 discord_channel_id
-                    .send_message(&ctx.http, |m| {
-                        m.embed(|e| {
-                            e.title("Hydration reminder")
-                                .description("Remember to drink some water 🥤!")
-                        })
-                    })
+                    .send_message(
+                        &ctx.http,
+                        CreateMessage::new().embed(
+                            CreateEmbed::new()
+                                .title("Hydration reminder")
+                                .description("Remember to drink some water 🥤!"),
+                        ),
+                    )
                     .await
                     .expect_or_log("Failed to send hydration reminder");
             }

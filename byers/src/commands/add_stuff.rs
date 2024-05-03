@@ -1,7 +1,8 @@
 use crate::event_handlers::message::update_activity;
 use crate::prelude::*;
 use fred::prelude::{Expiration, KeysInterface};
-use judeharley::{db::DbCan, PgPool};
+use judeharley::{db::DbCan, DiscordTimestamp, PgPool};
+use poise::{serenity_prelude::CreateEmbed, CreateReply};
 
 /// Adds... things
 #[poise::command(slash_command, subcommands("can", "bear", "john"), subcommand_required)]
@@ -36,13 +37,15 @@ async fn addcan_action(ctx: Context<'_>) -> Result<(), Error> {
         .await?
         .is_some()
     {
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title(&can_town_name)
-                    .description("Woah, slow down there! Rome wasn't built in a day!")
-            })
-            .ephemeral(true)
-        })
+        ctx.send(
+            CreateReply::default()
+                .embed(
+                    CreateEmbed::new()
+                        .title(&can_town_name)
+                        .description("Woah, slow down there! Rome wasn't built in a day!"),
+                )
+                .ephemeral(true),
+        )
         .await?;
 
         return Ok(());
@@ -52,16 +55,22 @@ async fn addcan_action(ctx: Context<'_>) -> Result<(), Error> {
         .set("can", "true", Some(Expiration::EX(35)), None, false)
         .await?;
 
-    add_can(&ctx.data().db, ctx.author().id.0).await?;
+    add_can(&ctx.data().db, ctx.author().id.get()).await?;
 
     let can_count = DbCan::count(&ctx.data().db).await?;
     let can_town_name = can_name("Can", can_count);
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title(&can_town_name)
-                .description(format!("You place a can in {can_town_name}. There's now {can_count} cans. Someone can add another in 35 seconds."))
-        })
-    }).await?;
+    let now_in_35_seconds = chrono::Utc::now() + chrono::Duration::seconds(35);
+    ctx.send(
+        CreateReply::default()
+            .embed(
+                CreateEmbed::new()
+                    .title(&can_town_name)
+                    .description(format!(
+                        "You place a can in {can_town_name}. There's now {can_count} cans. Someone can add another {}.",
+                        now_in_35_seconds.relative_time()
+                    )),
+            )
+    ).await?;
 
     Ok(())
 }
@@ -80,13 +89,15 @@ async fn addbear_action(ctx: Context<'_>) -> Result<(), Error> {
         .await?
         .is_some()
     {
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title(&can_town_name)
-                    .description("Woah, slow down there! Rome wasn't built in a day!")
-            })
-            .ephemeral(true)
-        })
+        ctx.send(
+            CreateReply::default()
+                .embed(
+                    CreateEmbed::new()
+                        .title(&can_town_name)
+                        .description("Woah, slow down there! Rome wasn't built in a day!"),
+                )
+                .ephemeral(true),
+        )
         .await?;
 
         return Ok(());
@@ -96,16 +107,22 @@ async fn addbear_action(ctx: Context<'_>) -> Result<(), Error> {
         .set("can", "true", Some(Expiration::EX(35)), None, false)
         .await?;
 
-    add_can(&ctx.data().db, ctx.author().id.0).await?;
+    add_can(&ctx.data().db, ctx.author().id.get()).await?;
 
     let can_count = DbCan::count(&ctx.data().db).await?;
     let can_town_name = can_name("Bear", can_count);
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title(&can_town_name)
-                .description(format!("You place a bear in {can_town_name}. There's now {can_count} bears. Someone can add another in 35 seconds."))
-        })
-    }).await?;
+    let now_in_35_seconds = chrono::Utc::now() + chrono::Duration::seconds(35);
+    ctx.send(
+        CreateReply::default()
+            .embed(
+                CreateEmbed::new()
+                    .title(&can_town_name)
+                    .description(format!(
+                        "You place a bear in {can_town_name}. There's now {can_count} bears. Someone can add another {}.",
+                        now_in_35_seconds.relative_time()
+                    )),
+            )
+    ).await?;
 
     Ok(())
 }
@@ -171,7 +188,7 @@ pub async fn john(ctx: ApplicationContext<'_>) -> Result<(), Error> {
         update_activity(ctx.data, ctx.author().id, ctx.channel_id(), guild_id).await?;
     }
 
-    ctx.send(|m| m.embed(|e| e.title("no").description("just no")))
+    ctx.send(CreateReply::default().embed(CreateEmbed::new().title("no").description("just no")))
         .await?;
 
     Ok(())

@@ -1,13 +1,14 @@
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 use clap::{Parser, Subcommand};
-use judeharley::{db::DbSong, PgPool};
+use judeharley::{PgPool, SUPPORTED_AUDIO_FORMATS};
 use notify::Watcher;
 use tokio::sync::{mpsc::Receiver, Mutex};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 #[derive(Parser)]
 #[command(author, about, version)]
@@ -69,13 +70,13 @@ struct StreamlabsImport {
 fn async_watcher(
     handle: tokio::runtime::Handle,
 ) -> anyhow::Result<(
-    notify::RecommendedWatcher,
+    impl notify::Watcher,
     Receiver<notify::Result<notify::event::Event>>,
 )> {
     let (tx, rx) = tokio::sync::mpsc::channel(1);
     let tx = Arc::new(Mutex::new(tx));
 
-    let watcher = notify::RecommendedWatcher::new(
+    let watcher = notify::PollWatcher::new(
         move |res| {
             debug!("received event: {:?}", res);
             let tx_clone = Arc::clone(&tx);
@@ -85,7 +86,7 @@ fn async_watcher(
                 tx.send(res).await.unwrap();
             });
         },
-        notify::Config::default(),
+        notify::Config::default().with_poll_interval(Duration::from_secs(5)),
     )?;
 
     Ok((watcher, rx))
@@ -164,6 +165,74 @@ async fn async_watch<P: AsRef<Path>>(path: P, watcher_pool: PgPool) -> anyhow::R
                             judeharley::maintenance::indexing::index_file(
                                 watcher_pool.clone(),
                                 entry.path(),
+                                path.as_ref(),
+                            )
+                            .await
+                            .unwrap();
+                        }
+                    }
+                }
+            }
+            notify::event::EventKind::Create(notify::event::CreateKind::Any) => {
+                debug!("file or folder created: {:?}", event.paths);
+                let file_path = event.paths.first().unwrap();
+                if file_path.is_file() {
+                    judeharley::maintenance::indexing::index_file(
+                        watcher_pool.clone(),
+                        file_path,
+                        path.as_ref(),
+                    )
+                    .await?;
+                } else if file_path.is_dir() {
+                    for entry in walkdir::WalkDir::new(file_path) {
+                        let entry = entry.unwrap();
+                        if entry.file_type().is_file() {
+                            judeharley::maintenance::indexing::index_file(
+                                watcher_pool.clone(),
+                                entry.path(),
+                                path.as_ref(),
+                            )
+                            .await
+                            .unwrap();
+                        }
+                    }
+                } else {
+                    warn!(
+                        "file or folder is not actually a file, nor a folder: {:?}",
+                        file_path
+                    );
+                }
+            }
+            notify::event::EventKind::Remove(notify::event::RemoveKind::Any) => {
+                debug!("file or folder removed: {:?}", event.paths);
+                let file_path = event.paths.first().unwrap();
+
+                if file_path.is_file() {
+                    judeharley::maintenance::indexing::drop_index(
+                        watcher_pool.clone(),
+                        file_path,
+                        path.as_ref(),
+                    )
+                    .await
+                    .unwrap();
+                } else if file_path.is_dir() {
+                    judeharley::maintenance::indexing::drop_index_folder(
+                        watcher_pool.clone(),
+                        file_path,
+                        path.as_ref(),
+                    )
+                    .await
+                    .unwrap();
+                } else {
+                    warn!(
+                        "file or folder is not actually a file, nor a folder, dropping by extension"
+                    );
+                    if let Some(extension) = file_path.extension() {
+                        let ext_str = extension.to_string_lossy().to_lowercase();
+                        if SUPPORTED_AUDIO_FORMATS.contains(&ext_str.as_str()) {
+                            judeharley::maintenance::indexing::drop_index(
+                                watcher_pool.clone(),
+                                file_path,
                                 path.as_ref(),
                             )
                             .await

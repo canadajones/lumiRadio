@@ -1,4 +1,7 @@
-use poise::{serenity_prelude::User, Modal};
+use poise::{
+    serenity_prelude::{CreateEmbed, User},
+    CreateReply, Modal,
+};
 
 use judeharley::{
     db::{DbSlcbRank, DbUser},
@@ -16,7 +19,7 @@ pub async fn boondollars(ctx: ApplicationContext<'_>) -> Result<(), Error> {
         update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
     }
 
-    let user = DbUser::fetch_or_insert(&data.db, ctx.author().id.0 as i64).await?;
+    let user = DbUser::fetch_or_insert(&data.db, ctx.author().id.get() as i64).await?;
 
     // $username - Hours: $hours (Rank #$hourspos) - $currencyname: $points (Rank #$pointspos) - Echeladder: $rank • Next rung in $nxtrankreq hours. - You can check again in 5 minutes.
     let hours = user.watched_time.clone();
@@ -47,42 +50,46 @@ async fn pay_user(
         update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
     }
 
-    let mut source_db_user = DbUser::fetch_or_insert(&data.db, ctx.author().id.0 as i64).await?;
-    let mut target_db_user = DbUser::fetch_or_insert(&data.db, target_user.id.0 as i64).await?;
+    let mut source_db_user =
+        DbUser::fetch_or_insert(&data.db, ctx.author().id.get() as i64).await?;
+    let mut target_db_user = DbUser::fetch_or_insert(&data.db, target_user.id.get() as i64).await?;
 
     if source_db_user.boonbucks < amount {
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title("Payment failed").description(format!(
+        ctx.send(
+            CreateReply::default().embed(CreateEmbed::new().title("Payment failed").description(
+                format!(
                     "You don't have enough Boondollars to pay that much! You have {}.",
                     source_db_user.boonbucks
-                ))
-            })
-        })
+                ),
+            )),
+        )
         .await?;
         return Ok(());
     }
 
     if amount < 0 {
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title("Payment failed")
-                    .description("You can't pay negative boondollars!")
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(
+                CreateEmbed::new()
+                    .title("Payment failed")
+                    .description("You can't pay negative boondollars!".to_string()),
+            ),
+        )
         .await?;
         return Ok(());
     }
 
     if source_db_user.id == target_db_user.id {
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title("Payment successful").description(format!(
-                    "You paid yourself {} Boondollars. Good job.",
-                    amount
-                ))
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(
+                CreateEmbed::new()
+                    .title("Payment successful")
+                    .description(format!(
+                        "Congratulations. You just paid yourself {} Boondollars.",
+                        amount
+                    )),
+            ),
+        )
         .await?;
         return Ok(());
     }
@@ -97,21 +104,18 @@ async fn pay_user(
 
     transaction.commit().await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Payment successful").description(format!(
-                "You paid {} {} Boondollars.",
-                target_user.name, amount
-            ))
-        })
-    })
+    ctx.send(
+        CreateReply::default().embed(CreateEmbed::new().title("Payment successful").description(
+            format!("You paid {} {} Boondollars.", target_user.name, amount),
+        )),
+    )
     .await?;
 
     Ok(())
 }
 
 /// Pay another user some Boondollars
-#[poise::command(slash_command, user_cooldown = 300)]
+#[poise::command(slash_command, rename = "give", user_cooldown = 300)]
 pub async fn pay(ctx: ApplicationContext<'_>, target_user: User, amount: i32) -> Result<(), Error> {
     pay_user(ctx, target_user, amount).await
 }

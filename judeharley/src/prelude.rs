@@ -7,8 +7,13 @@ use fred::{
 pub(crate) type Error = JudeHarleyError;
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 
+pub static SUPPORTED_AUDIO_FORMATS: [&str; 4] = ["mp3", "flac", "ogg", "wav"];
+
 #[derive(Debug, thiserror::Error)]
 pub enum JudeHarleyError {
+    #[error("Song not found")]
+    SongNotFound,
+
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
     #[error(transparent)]
@@ -73,31 +78,31 @@ impl DiscordTimestamp for i64 {
 
 impl DiscordTimestamp for NaiveDateTime {
     fn short_time(&self) -> String {
-        format!("<t:{}:t>", self.timestamp())
+        format!("<t:{}:t>", self.and_utc().timestamp())
     }
 
     fn long_time(&self) -> String {
-        format!("<t:{}:T>", self.timestamp())
+        format!("<t:{}:T>", self.and_utc().timestamp())
     }
 
     fn short_date(&self) -> String {
-        format!("<t:{}:d>", self.timestamp())
+        format!("<t:{}:d>", self.and_utc().timestamp())
     }
 
     fn long_date(&self) -> String {
-        format!("<t:{}:D>", self.timestamp())
+        format!("<t:{}:D>", self.and_utc().timestamp())
     }
 
     fn long_date_short_time(&self) -> String {
-        format!("<t:{}:f>", self.timestamp())
+        format!("<t:{}:f>", self.and_utc().timestamp())
     }
 
     fn long_date_with_dow_short_time(&self) -> String {
-        format!("<t:{}:F>", self.timestamp())
+        format!("<t:{}:F>", self.and_utc().timestamp())
     }
 
     fn relative_time(&self) -> String {
-        format!("<t:{}:R>", self.timestamp())
+        format!("<t:{}:R>", self.and_utc().timestamp())
     }
 }
 
@@ -165,14 +170,16 @@ impl TryFrom<W<chrono::NaiveDateTime>> for RedisValue {
     type Error = JudeHarleyError;
 
     fn try_from(value: W<chrono::NaiveDateTime>) -> Result<Self> {
-        Ok(RedisValue::Integer(value.0.timestamp()))
+        Ok(RedisValue::Integer(value.0.and_utc().timestamp()))
     }
 }
 
 impl FromRedis for W<chrono::NaiveDateTime> {
     fn from_value(value: fred::types::RedisValue) -> std::result::Result<Self, RedisError> {
         if let fred::types::RedisValue::Integer(i) = value {
-            Ok(W(chrono::NaiveDateTime::from_timestamp_opt(i, 0).unwrap()))
+            Ok(W(chrono::DateTime::from_timestamp(i, 0)
+                .unwrap()
+                .naive_utc()))
         } else {
             Err(fred::prelude::RedisError::new(
                 RedisErrorKind::Parse,

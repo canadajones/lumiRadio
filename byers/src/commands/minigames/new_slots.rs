@@ -1,6 +1,9 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 
 use async_trait::async_trait;
+use poise::serenity_prelude::CreateEmbed;
+use poise::CreateReply;
 use rand::seq::SliceRandom;
 use strum::{EnumIter, IntoEnumIterator};
 
@@ -21,6 +24,12 @@ pub enum SlotSymbols {
     DoubleBar,
     Bar,
     Cherry,
+}
+
+impl Display for SlotSymbols {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.symbol())
+    }
 }
 
 impl SlotSymbols {
@@ -258,8 +267,14 @@ pub async fn slots_info(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     If none of these combinations are spun, you lose your bet. If you win, you get your bet back multiplied by the payout. For example, if you bet 5 Boondollars and win 40x, you get 200 Boondollars back."#
     );
 
-    ctx.send(|m| m.embed(|e| e.title("Slot Machine").description(description)))
-        .await?;
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Slot Machine")
+                .description(description),
+        ),
+    )
+    .await?;
 
     Ok(())
 }
@@ -279,28 +294,23 @@ pub async fn slots(
         update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
     }
 
-    let user_cooldown = UserCooldownKey::new(ctx.author().id.0 as i64, "slots");
+    let user_cooldown = UserCooldownKey::new(ctx.author().id.get() as i64, "slots");
     if let Some(over) = is_on_cooldown(&data.redis_pool, user_cooldown).await? {
-        ctx.send(|m| {
-            m.embed(|e| {
-                NewSlots::prepare_embed(e).description(format!(
-                    "The slot machine is broken. Come back {}.",
-                    over.relative_time(),
-                ))
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(NewSlots::prepare_embed().description(format!(
+                "The slot machine is broken. Come back {}.",
+                over.relative_time()
+            ))),
+        )
         .await?;
         return Ok(());
     }
 
-    let mut user = DbUser::fetch_or_insert(&data.db, ctx.author().id.0 as i64).await?;
+    let mut user = DbUser::fetch_or_insert(&data.db, ctx.author().id.get() as i64).await?;
     if user.boonbucks < bet {
-        ctx.send(|m| {
-            m.embed(|e| {
-                NewSlots::prepare_embed(e)
-                    .description("You need at least 5 Boondollars to play slots")
-            })
-        })
+        ctx.send(CreateReply::default().embed(
+            NewSlots::prepare_embed().description("You need at least 1 Boondollar to play slots"),
+        ))
         .await?;
         return Ok(());
     }
@@ -313,9 +323,9 @@ pub async fn slots(
     let (payout, reels) = machine.play().await?;
     // let jackpot = server_config.slot_jackpot;
     let Some(payout) = payout else {
-        ctx.send(|m| {
-            m.embed(|e| {
-                NewSlots::prepare_embed(e)
+        ctx.send(
+            CreateReply::default().embed(
+                NewSlots::prepare_embed()
                     .description("You spin the slot machine and... **lost**!")
                     .field(
                         "Rolls",
@@ -326,17 +336,17 @@ pub async fn slots(
                             reels[2].symbol()
                         ),
                         false,
-                    )
-            })
-        })
+                    ),
+            ),
+        )
         .await?;
         return Ok(());
     };
 
     if payout == 1200 {
-        ctx.send(|m| {
-            m.embed(|e| {
-                NewSlots::prepare_embed(e)
+        ctx.send(
+            CreateReply::default().embed(
+                NewSlots::prepare_embed()
                     .description("You spin the slot machine and... **won the jackpot**!")
                     .field(
                         "Rolls",
@@ -348,14 +358,14 @@ pub async fn slots(
                         ),
                         false,
                     )
-                    .field("Payout", (payout * bet as u32).to_string(), false)
-            })
-        })
+                    .field("Payout", (payout * bet as u32).to_string(), false),
+            ),
+        )
         .await?;
     } else if payout == 1 {
-        ctx.send(|m| {
-            m.embed(|e| {
-                NewSlots::prepare_embed(e)
+        ctx.send(
+            CreateReply::default().embed(
+                NewSlots::prepare_embed()
                     .description(
                         "You spin the slot machine and... well, at least you got your money back.",
                     )
@@ -369,15 +379,15 @@ pub async fn slots(
                         ),
                         false,
                     )
-                    .field("Payout", (payout * bet as u32).to_string(), false)
-            })
-        })
+                    .field("Payout", (payout * bet as u32).to_string(), false),
+            ),
+        )
         .await?;
     } else {
-        ctx.send(|m| {
-            m.embed(|e| {
-                NewSlots::prepare_embed(e)
-                    .description("You spin the slot machine and... **won**!")
+        ctx.send(
+            CreateReply::default().embed(
+                NewSlots::prepare_embed()
+                    .description("You spin the slot machine and... **lost**!")
                     .field(
                         "Rolls",
                         format!(
@@ -388,9 +398,9 @@ pub async fn slots(
                         ),
                         false,
                     )
-                    .field("Payout", (payout * bet as u32).to_string(), false)
-            })
-        })
+                    .field("Payout", (payout * bet as u32).to_string(), false),
+            ),
+        )
         .await?;
     }
 

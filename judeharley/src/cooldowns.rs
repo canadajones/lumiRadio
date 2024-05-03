@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime};
 use fred::{pool::RedisPool, prelude::KeysInterface};
 
 use crate::prelude::*;
@@ -69,7 +69,7 @@ where
     };
 
     let value: i64 = value.parse()?;
-    let over = NaiveDateTime::from_timestamp_opt(value, 0).unwrap();
+    let over = DateTime::from_timestamp(value, 0).unwrap().naive_utc();
     let now = chrono::Utc::now().naive_utc();
 
     if over < now {

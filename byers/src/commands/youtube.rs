@@ -1,12 +1,13 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use poise::serenity_prelude::{self as serenity, ApplicationCommandInteraction};
+use poise::{
+    serenity_prelude::{CreateActionRow, CreateButton, CreateEmbed},
+    CreateReply,
+};
 use situwaition::{
-    runtime::AsyncWaiter, SituwaitionError, SituwaitionOpts, SituwaitionOptsBuilder,
-    TokioAsyncSituwaition,
+    runtime::AsyncWaiter, SituwaitionError, SituwaitionOptsBuilder, TokioAsyncSituwaition,
 };
 use tracing::error;
-use tracing_unwrap::ResultExt;
 
 use crate::{event_handlers::message::update_activity, prelude::*};
 use judeharley::{
@@ -37,43 +38,45 @@ pub async fn link(ctx: ApplicationContext<'_>) -> Result<(), Error> {
         update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
     }
 
-    let mut user = DbUser::fetch_or_insert(&data.db, ctx.author().id.0 as i64).await?;
+    let mut user = DbUser::fetch_or_insert(&data.db, ctx.author().id.get() as i64).await?;
 
     if user.migrated {
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title("Already migrated")
-                    .description("You have already migrated your account!")
-            })
-        })
+        ctx.send(
+            CreateReply::default()
+                .embed(
+                    CreateEmbed::new()
+                        .title("Already migrated")
+                        .description("You have already migrated your account!"),
+                )
+                .ephemeral(true),
+        )
         .await?;
 
         return Ok(());
     }
 
-    let handle = ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Link your YouTube channel")
-                .description(r#"In order to link your YouTube channel with the bot, you will need to link your YouTube account with your Discord account.
-                To do that, go into your Settings, then "Connections" and then add your YouTube account to your Discord account. **Please make sure that your YouTube account name is the same as when you last chatted on the radio!**
+    let handle = ctx.send(
+        CreateReply::default()
+            .embed(
+                CreateEmbed::new()
+                    .title("Link your YouTube channel")
+                    .description(r#"In order to link your YouTube channel with the bot, you will need to link your YouTube account with your Discord account.
+To do that, go into your Settings, then "Connections" and then add your YouTube account to your Discord account. **Please make sure that your YouTube account name is the same as when you last chatted on the radio!**
 
-                After that, please press the **Log In** button below and complete the steps.
-                Once you have completed the steps, this message will update and prompt you to select the channel you want to import data from.
-                This relies on your channel name! If you have changed your channel name, please change it back to the old one, link your account and THEN log in with the button.
-                
-                If you don't remember your old YouTube name or you no longer have access to your YouTube account, please message <@108693106194399232> about it!"#)
-        })
-        .components(|c| {
-            c.create_action_row(|ar| {
-                ar.create_button(|b| {
-                    b.label("Log In")
-                    .style(serenity::ButtonStyle::Link)
-                    .emoji('🔗')
-                    .url("https://discord.lumirad.io/oauth2/login")
-                })
-            })
-        })
-    }).await?;
+After that, please press the **Log In** button below and complete the steps.
+Once you have completed the steps, this message will update and prompt you to select the channel you want to import data from.
+This relies on your channel name! If you have changed your channel name, please change it back to the old one, link your account and THEN log in with the button.
+
+If you don't remember your old YouTube name or you no longer have access to your YouTube account, please message <@108693106194399232> about it!"#)
+            )
+            .components(vec![
+                CreateActionRow::Buttons(vec![
+                    CreateButton::new_link("https://discord.lumirad.io/oauth2/login")
+                        .label("Log In")
+                        .emoji('🔗'),
+                ]),
+            ])
+    ).await?;
 
     let linked_channels = AsyncWaiter::with_opts(
         || async {
@@ -97,28 +100,46 @@ pub async fn link(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     .exec()
     .await;
 
+    // b.embed(|e| {
+    //     e.title("No channels found")
+    //         .description("No channels found. Please make sure you have linked your YouTube account with your Discord account!")
+    // })
+    // .components(|c| c)
     let channels = match linked_channels {
         Ok(c) => c,
         Err(SituwaitionError::TimeoutError(YoutubeError::NoChannelFound)) => {
-            handle.edit(poise::Context::Application(ctx), |b| {
-                b.embed(|e| {
-                    e.title("No channels found")
-                        .description("No channels found. Please make sure you have linked your YouTube account with your Discord account!")
-                })
-                .components(|c| c)
-            }).await?;
+            handle.edit(
+                poise::Context::Application(ctx),
+                CreateReply::default()
+                    .embed(
+                        CreateEmbed::new()
+                            .title("No channels found")
+                            .description("No channels found. Please make sure you have linked your YouTube account with your Discord account!"),
+                    )
+                    .components(vec![]),
+            ).await?;
             return Ok(());
         }
         Err(e) => {
             error!("Failed to fetch linked channels: {}", e);
+            // b.embed(|e| {
+            //     e.title("Failed to fetch linked channels")
+            //         .description("Failed to fetch linked channels. Please try again later!")
+            // })
+            // .components(|c| c)
             handle
-                .edit(poise::Context::Application(ctx), |b| {
-                    b.embed(|e| {
-                        e.title("Failed to fetch linked channels")
-                            .description("Failed to fetch linked channels. Please try again later!")
-                    })
-                    .components(|c| c)
-                })
+                .edit(
+                    poise::Context::Application(ctx),
+                    CreateReply::default()
+                        .embed(
+                            CreateEmbed::new()
+                                .title("Failed to fetch linked channels")
+                                .description(
+                                    "Failed to fetch linked channels. Please try again later!",
+                                ),
+                        )
+                        .components(vec![]),
+                )
                 .await?;
             return Ok(());
         }
@@ -135,13 +156,16 @@ pub async fn link(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     }
 
     let Some(slcb_account) = slcb_account else {
-        handle.edit(poise::Context::Application(ctx), |b| {
-            b.embed(|e| {
-                e.title("No importable channels found")
-                    .description("No importable channels found. Please make sure you have linked your YouTube account with your Discord account! If it still doesn't show up, please message <@108693106194399232> about it!")
-            })
-            .components(|c| c)
-        }).await?;
+        handle.edit(
+            poise::Context::Application(ctx),
+            CreateReply::default()
+                .embed(
+                    CreateEmbed::new()
+                        .title("No importable channels found")
+                        .description("No importable channels found. Please make sure you have linked your YouTube account with your Discord account! If it still doesn't show up, please message <@108693106194399232> about it!")
+                )
+                .components(vec![]),
+        ).await?;
         return Ok(());
     };
 
@@ -151,16 +175,27 @@ pub async fn link(ctx: ApplicationContext<'_>) -> Result<(), Error> {
 
     user.update(&data.db).await?;
 
+    // b.embed(|e| {
+    //     e.title("Successfully imported data!").description(format!(
+    //         "Successfully imported data from {}!",
+    //         slcb_account.username
+    //     ))
+    // })
+    // .components(|c| c)
     handle
-        .edit(Context::Application(ctx), |b| {
-            b.embed(|e| {
-                e.title("Successfully imported data!").description(format!(
-                    "Successfully imported data from {}!",
-                    slcb_account.username
-                ))
-            })
-            .components(|c| c)
-        })
+        .edit(
+            Context::Application(ctx),
+            CreateReply::default()
+                .embed(
+                    CreateEmbed::new()
+                        .title("Successfully imported data!")
+                        .description(format!(
+                            "Successfully imported data from {}!",
+                            slcb_account.username
+                        )),
+                )
+                .components(vec![]),
+        )
         .await?;
 
     Ok(())

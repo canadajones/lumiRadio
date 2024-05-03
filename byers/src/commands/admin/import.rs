@@ -1,4 +1,7 @@
-use poise::{serenity_prelude::User, AutocompleteChoice};
+use poise::{
+    serenity_prelude::{AutocompleteChoice, CreateEmbed, User},
+    CreateReply,
+};
 use tracing_unwrap::ResultExt;
 
 use crate::prelude::*;
@@ -10,20 +13,29 @@ use judeharley::{
 pub async fn autocomplete_channels(
     ctx: ApplicationContext<'_>,
     partial: &str,
-) -> impl Iterator<Item = poise::AutocompleteChoice<i32>> {
+) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
     let data = ctx.data;
 
+    // AutocompleteChoice {
+    //     name: format!(
+    //         "{} (Hours: {}, Points: {})",
+    //         user.username, user.hours, user.points
+    //     ),
+    //     value: user.id,
+    // }
     DbSlcbUser::search_by_username(&data.db, partial)
         .await
         .expect_or_log("Failed to fetch possible channels")
         .into_iter()
         .take(20)
-        .map(|user| AutocompleteChoice {
-            name: format!(
-                "{} (Hours: {}, Points: {})",
-                user.username, user.hours, user.points
-            ),
-            value: user.id,
+        .map(|user| {
+            AutocompleteChoice::new(
+                format!(
+                    "{} (Hours: {}, Points: {})",
+                    user.username, user.hours, user.points
+                ),
+                user.id,
+            )
         })
 }
 
@@ -37,14 +49,15 @@ pub async fn import_manually(
 ) -> Result<(), Error> {
     let data = ctx.data();
 
-    let mut user = DbUser::fetch_or_insert(&data.db, user.id.0 as i64).await?;
+    let mut user = DbUser::fetch_or_insert(&data.db, user.id.get() as i64).await?;
     if user.migrated {
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title("User already migrated")
-                    .description("This user had their data already imported!")
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(
+                CreateEmbed::new()
+                    .title("User already migrated")
+                    .description("This user had their data already imported!"),
+            ),
+        )
         .await?;
 
         return Ok(());
@@ -55,12 +68,13 @@ pub async fn import_manually(
     user.migrated = true;
     user.update(&data.db).await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Imported user data")
-                .description(format!("Imported {} hours and {} points", hours, points))
-        })
-    })
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Imported user data")
+                .description(format!("Imported {} hours and {} points", hours, points)),
+        ),
+    )
     .await?;
 
     Ok(())
@@ -77,15 +91,16 @@ pub async fn import(
 ) -> Result<(), Error> {
     let data = ctx.data();
 
-    let mut user = DbUser::fetch_or_insert(&data.db, user.id.0 as i64).await?;
+    let mut user = DbUser::fetch_or_insert(&data.db, user.id.get() as i64).await?;
 
     if user.migrated {
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title("User already migrated")
-                    .description("This user had their data already imported!")
-            })
-        })
+        ctx.send(
+            CreateReply::default().embed(
+                CreateEmbed::new()
+                    .title("User already migrated")
+                    .description("This user had their data already imported!"),
+            ),
+        )
         .await?;
 
         return Ok(());
@@ -99,14 +114,14 @@ pub async fn import(
     user.migrated = true;
     user.update(&data.db).await?;
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title("Imported user data").description(format!(
+    ctx.send(
+        CreateReply::default().embed(CreateEmbed::new().title("Imported user data").description(
+            format!(
                 "Imported {} hours and {} points from {}",
                 slcb_user.hours, slcb_user.points, slcb_user.username
-            ))
-        })
-    })
+            ),
+        )),
+    )
     .await?;
 
     Ok(())
