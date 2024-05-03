@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog],
 and this project adheres to [Semantic Versioning].
 
+## [1.2.1] - 2024-05-03
+
+### Fixed
+
+- Fixed the slot machine not working
+- Fixed the slot machine description having the wrong indents
+
 ## [1.2.0] - 2024-05-03
 
 ### Added

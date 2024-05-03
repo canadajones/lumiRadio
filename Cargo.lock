@@ -474,7 +474,7 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "byers"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "async-fred-session",
@@ -1208,7 +1208,7 @@ dependencies = [
 
 [[package]]
 name = "frohike"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1726,7 +1726,7 @@ dependencies = [
 
 [[package]]
 name = "judeharley"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "async-trait",
  "audiotags",
@@ -1776,7 +1776,7 @@ dependencies = [
 
 [[package]]
 name = "langley"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "axum",
  "fred",

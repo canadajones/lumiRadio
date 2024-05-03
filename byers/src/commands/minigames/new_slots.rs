@@ -158,35 +158,35 @@ impl SlotMachine {
 
         if *symbol_counts
             .get(&ReelSymbol::Symbol(SlotSymbols::Jackpot))
-            .unwrap()
+            .unwrap_or(&0)
             == 3
         {
             return (Some(1200), reel);
         } else if *symbol_counts
             .get(&ReelSymbol::Symbol(SlotSymbols::RedSeven))
-            .unwrap()
+            .unwrap_or(&0)
             == 3
         {
             return (Some(200), reel);
         } else if *symbol_counts
             .get(&ReelSymbol::Symbol(SlotSymbols::TripleBar))
-            .unwrap()
+            .unwrap_or(&0)
             == 3
         {
             return (Some(100), reel);
         } else if *symbol_counts
             .get(&ReelSymbol::Symbol(SlotSymbols::DoubleBar))
-            .unwrap()
+            .unwrap_or(&0)
             == 3
         {
             return (Some(90), reel);
         } else if *symbol_counts
             .get(&ReelSymbol::Symbol(SlotSymbols::Bar))
-            .unwrap()
+            .unwrap_or(&0)
             == 3
             || *symbol_counts
                 .get(&ReelSymbol::Symbol(SlotSymbols::Cherry))
-                .unwrap()
+                .unwrap_or(&0)
                 == 3
         {
             return (Some(40), reel);
@@ -194,13 +194,13 @@ impl SlotMachine {
             return (Some(10), reel);
         } else if *symbol_counts
             .get(&ReelSymbol::Symbol(SlotSymbols::Cherry))
-            .unwrap()
+            .unwrap_or(&0)
             == 2
         {
             return (Some(5), reel);
         } else if *symbol_counts
             .get(&ReelSymbol::Symbol(SlotSymbols::Cherry))
-            .unwrap()
+            .unwrap_or(&0)
             == 1
         {
             return (Some(1), reel);
@@ -243,28 +243,28 @@ pub async fn slots_info(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     let description = format!(
         r#"# How the Slot Machine works
     
-    The slot machine has 3 reels, each with 64 symbols. The symbols are weighted, so some symbols are more likely to appear than others. The weights are as follows:
+The slot machine has 3 reels, each with 64 symbols. The symbols are weighted, so some symbols are more likely to appear than others. The weights are as follows:
 
-    - Jackpot ({jackpot}): 6
-    - Red Seven ({red_seven}): 8
-    - Triple Bar ({triple_bar}): 9
-    - Double Bar ({double_bar}): 11
-    - Bar ({bar}): 22
-    - Cherry ({cherry}): 8
+- Jackpot ({jackpot}): 6
+- Red Seven ({red_seven}): 8
+- Triple Bar ({triple_bar}): 9
+- Double Bar ({double_bar}): 11
+- Bar ({bar}): 22
+- Cherry ({cherry}): 8
 
-    Additionally, there are 64 blanks on each reel. The reels are spun, and the symbols that appear on the middle row are used to determine the payout. The payout is determined as follows:
+Additionally, there are 64 blanks on each reel. The reels are spun, and the symbols that appear on the middle row are used to determine the payout. The payout is determined as follows:
 
-    {jackpot} {jackpot} {jackpot}: 1200x
-    {red_seven} {red_seven} {red_seven}: 200x
-    {triple_bar} {triple_bar} {triple_bar}: 100x
-    {double_bar} {double_bar} {double_bar}: 90x
-    {bar} {bar} {bar}: 40x
-    {cherry} {cherry} {cherry}: 40x
-    any 3 of {bar}, {double_bar}, {triple_bar}: 10x
-    any 2 {cherry}: 5x
-    any 1 {cherry}: 1x
+{jackpot} {jackpot} {jackpot}: 1200x
+{red_seven} {red_seven} {red_seven}: 200x
+{triple_bar} {triple_bar} {triple_bar}: 100x
+{double_bar} {double_bar} {double_bar}: 90x
+{bar} {bar} {bar}: 40x
+{cherry} {cherry} {cherry}: 40x
+any 3 of {bar}, {double_bar}, {triple_bar}: 10x
+any 2 {cherry}: 5x
+any 1 {cherry}: 1x
 
-    If none of these combinations are spun, you lose your bet. If you win, you get your bet back multiplied by the payout. For example, if you bet 5 Boondollars and win 40x, you get 200 Boondollars back."#
+If none of these combinations are spun, you lose your bet. If you win, you get your bet back multiplied by the payout. For example, if you bet 5 Boondollars and win 40x, you get 200 Boondollars back."#
     );
 
     ctx.send(
