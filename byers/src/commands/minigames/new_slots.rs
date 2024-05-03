@@ -387,7 +387,7 @@ pub async fn slots(
         ctx.send(
             CreateReply::default().embed(
                 NewSlots::prepare_embed()
-                    .description("You spin the slot machine and... **lost**!")
+                    .description("You spin the slot machine and... **won**!")
                     .field(
                         "Rolls",
                         format!(
