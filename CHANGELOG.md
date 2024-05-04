@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog],
 and this project adheres to [Semantic Versioning].
 
+## [Unreleased] - 2024-05-03
+
+### Fixed
+
+- Fixed the slot machine showing "you lost" even though there was a payout
+
 ## [1.2.0] - 2024-05-03
 
 ### Added

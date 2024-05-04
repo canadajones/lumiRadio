@@ -6,23 +6,8 @@ pub struct AppConfig {
     pub database_url: String,
     pub redis_url: String,
 
-    pub liquidsoap: LiquidsoapConfig,
-
-    pub google: GoogleConfig,
     pub discord: DiscordConfig,
     pub secret: String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct LiquidsoapConfig {
-    pub host: String,
-    pub port: u16,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct GoogleConfig {
-    pub client_id: String,
-    pub client_secret: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
