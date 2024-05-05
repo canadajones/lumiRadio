@@ -6,7 +6,6 @@ use std::sync::Arc;
 use lazy_static::lazy_static;
 use tokio::sync::Mutex;
 
-use crate::app_config::GoogleConfig;
 use judeharley::communication::{ByersUnixStream, LiquidsoapCommunication};
 
 lazy_static! {
@@ -25,7 +24,6 @@ where
 {
     pub db: judeharley::PgPool,
     pub comms: Arc<Mutex<C>>,
-    pub google_config: GoogleConfig,
     pub redis_pool: fred::pool::RedisPool,
     pub redis_subscriber: fred::clients::SubscriberClient,
 }
