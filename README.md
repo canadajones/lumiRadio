@@ -6,6 +6,8 @@ The Homestuck Radio, now powered by Liquidsoap and a bunch of Rust code.
 
 In order to develop and test for the radio, you can follow the steps below to get a local development version running. Keep in mind that you will need to have Docker and Git installed on your system.
 
+Another dependency that the radio requires is `ffmpeg` and the headers for it as well as `Clang`.
+
 Additionally, as this project uses sqlx, you will need to install the sqlx-cli (`cargo install sqlx-cli`).
 
 1. You will need to [create a Discord bot](https://discord.com/developers/applications)

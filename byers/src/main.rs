@@ -122,7 +122,6 @@ async fn main() {
         comms: std::sync::Arc::new(tokio::sync::Mutex::new(
             ByersUnixStream::new().await.unwrap(),
         )),
-        google_config: config.google,
         redis_pool: redis_pool.clone(),
         redis_subscriber: subscriber_client.clone(),
     };
