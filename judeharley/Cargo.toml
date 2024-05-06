@@ -36,6 +36,7 @@ ffmpeg-next = { version = "7.0.0", default-features = false, features = [
     "format",
 ] }
 regex = "1.10.4"
+sea-orm = { version = "0.12.15", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-bigdecimal"] }
 
 [dependencies.sqlx]
 workspace = true
