@@ -3,7 +3,7 @@ use crate::event_handlers::message::update_activity;
 use crate::prelude::*;
 
 use rand::{thread_rng, Rng};
-use tracing::debug;
+use tracing::info;
 
 /// Chirps back at the person who chirps
 #[poise::command(slash_command)]
@@ -13,11 +13,11 @@ pub async fn chirp(ctx: ApplicationContext<'_>) -> Result<(), Error> {
         update_activity(ctx.data, ctx.author().id, ctx.channel_id(), guild_id).await?;
     }
 
-    debug!("chirping!");
+    info!("chirping!");
     // if author is @canadajones68
     if ctx.author().id == 329162131096338434 {
 
-        debug!("oh hai can");
+        info!("oh hai can");
         
         /*let rand_val = {
             let mut rng = thread_rng();
@@ -26,7 +26,7 @@ pub async fn chirp(ctx: ApplicationContext<'_>) -> Result<(), Error> {
 
         let rand_val = true;
 
-        debug!("randval obtained");
+        info!("randval obtained");
         if rand_val {
             ctx.send(
                 CreateReply::default()
@@ -42,7 +42,7 @@ pub async fn chirp(ctx: ApplicationContext<'_>) -> Result<(), Error> {
         )
         .await?;
     }
-    debug!("i has now replied to the chirp");
+    info!("i has now replied to the chirp");
 
     Ok(())
 }
