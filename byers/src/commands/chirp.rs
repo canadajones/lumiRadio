@@ -18,15 +18,10 @@ pub async fn chirp(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     if ctx.author().id == 329162131096338434 {
 
         info!("oh hai can");
-        
-        let rand_val = {
-            let mut rng = thread_rng();
-            rng.gen_bool(0.1)
-        };
 
 
         info!("randval obtained");
-        if rand_val {
+        if thread_rng().gen_bool(0.1) {
             ctx.send(
                 CreateReply::default()
                 .content("chorp")
