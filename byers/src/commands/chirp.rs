@@ -2,7 +2,7 @@ use poise::CreateReply;
 use crate::event_handlers::message::update_activity;
 use crate::prelude::*;
 
-use rand::{thread_rng, Rng};
+use rand::prelude::*;
 use tracing::info;
 
 /// Chirps back at the person who chirps
@@ -21,7 +21,7 @@ pub async fn chirp(ctx: ApplicationContext<'_>) -> Result<(), Error> {
 
 
         info!("randval obtained");
-        if thread_rng().gen_bool(0.1) {
+        if rand::random() {
             ctx.send(
                 CreateReply::default()
                 .content("chorp")
