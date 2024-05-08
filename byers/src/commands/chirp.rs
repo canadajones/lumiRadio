@@ -19,12 +19,11 @@ pub async fn chirp(ctx: ApplicationContext<'_>) -> Result<(), Error> {
 
         info!("oh hai can");
         
-        /*let rand_val = {
+        let rand_val = {
             let mut rng = thread_rng();
             rng.gen_bool(0.1)
-        };*/
+        };
 
-        let rand_val = true;
 
         info!("randval obtained");
         if rand_val {
