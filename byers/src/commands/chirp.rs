@@ -16,10 +16,11 @@ pub async fn chirp(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     // if author is @canadajones68
     if ctx.author().id == 329162131096338434 {
 
-        let rand_val = {
-            let mut rng = thread_rng();
-            rng.gen_bool(0.1)
-        };
+        //let rand_val = {
+        //    let mut rng = thread_rng();
+        //    rng.gen_bool(0.1)
+        //};
+        let rand_val = true;
 
         if rand_val {
             ctx.send(
