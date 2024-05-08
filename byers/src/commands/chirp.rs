@@ -2,6 +2,9 @@ use poise::CreateReply;
 use crate::event_handlers::message::update_activity;
 use crate::prelude::*;
 
+use rand::{thread_rng, Rng};
+
+
 /// Chirps back at the person who chirps
 #[poise::command(slash_command)]
 pub async fn chirp(ctx: ApplicationContext<'_>) -> Result<(), Error> {
@@ -10,11 +13,30 @@ pub async fn chirp(ctx: ApplicationContext<'_>) -> Result<(), Error> {
         update_activity(ctx.data, ctx.author().id, ctx.channel_id(), guild_id).await?;
     }
 
-    ctx.send(
-        CreateReply::default()
-            .content("chirp chirp")
-    )
-    .await?;
+    // if author is @canadajones68
+    if ctx.author().id == 329162131096338434 {
+
+        let rand_val = {
+            let mut rng = thread_rng();
+            rng.gen_bool(0.1)
+        };
+
+        if rand_val {
+            ctx.send(
+                CreateReply::default()
+                .content("chorp")
+            )
+            .await?;
+        }
+    }
+    else {
+        ctx.send(
+            CreateReply::default()
+                .content("chirp chirp")
+        )
+        .await?;
+    }
+    
 
     Ok(())
 }
