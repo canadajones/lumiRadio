@@ -16,6 +16,7 @@ use crate::{
         songs::*,
         version::*,
         youtube::*,
+        chirp::*
     },
     oauth2::oauth2_server,
     prelude::*,
@@ -53,6 +54,7 @@ async fn main() {
         addcan(),
         addbear(),
         what_song(),
+        chirp()
     ];
 
     info!("Loading {} commands...", commands.len());
