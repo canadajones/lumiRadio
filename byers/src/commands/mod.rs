@@ -5,7 +5,7 @@ use tracing_unwrap::ResultExt;
 use crate::event_handlers::message::update_activity;
 use crate::prelude::*;
 use ellipse::Ellipse;
-use judeharley::db::DbSong;
+use judeharley::Songs;
 
 pub mod add_stuff;
 pub mod admin;
@@ -20,9 +20,7 @@ pub mod youtube;
 /// Displays the link to the radio
 #[poise::command(slash_command)]
 pub async fn listen(ctx: ApplicationContext<'_>) -> Result<(), Error> {
-    if let Some(guild_id) = ctx.guild_id() {
-        update_activity(ctx.data, ctx.author().id, ctx.channel_id(), guild_id).await?;
-    }
+    update_activity(ctx.data, ctx.author().id, ctx.channel_id()).await?;
 
     ctx.send(
         CreateReply::default()
@@ -52,7 +50,7 @@ pub async fn autocomplete_songs(
 ) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
     let data = ctx.data();
 
-    let songs = DbSong::search(&data.db, partial)
+    let songs = Songs::search(partial, &data.db)
         .await
         .expect_or_log("Failed to query database");
 

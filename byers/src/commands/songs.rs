@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use futures::StreamExt;
-use judeharley::db::DbUser;
 use poise::serenity_prelude::{
     ButtonStyle, ComponentInteractionDataKind, CreateActionRow, CreateButton, CreateEmbed,
     CreateInteractionResponse, CreateInteractionResponseMessage, CreateSelectMenu,
@@ -16,8 +15,7 @@ use crate::prelude::*;
 use judeharley::{
     communication::LiquidsoapCommunication,
     cooldowns::{is_on_cooldown, set_cooldown, UserCooldownKey},
-    db::DbSong,
-    DiscordTimestamp,
+    DiscordTimestamp, SongRequests, Songs, Users,
 };
 
 /// Song-related commands
@@ -35,11 +33,9 @@ pub async fn song(_: ApplicationContext<'_>) -> Result<(), Error> {
 pub async fn history(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     let data = ctx.data;
 
-    if let Some(guild_id) = ctx.guild_id() {
-        update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
-    }
+    update_activity(data, ctx.author().id, ctx.channel_id()).await?;
 
-    let last_songs = DbSong::last_10_songs(&data.db).await?;
+    let last_songs = Songs::last_10_songs(&data.db).await?;
 
     let description = last_songs
         .into_iter()
@@ -65,11 +61,9 @@ pub async fn history(ctx: ApplicationContext<'_>) -> Result<(), Error> {
 pub async fn playing(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     let data = ctx.data;
 
-    if let Some(guild_id) = ctx.guild_id() {
-        update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
-    }
+    update_activity(data, ctx.author().id, ctx.channel_id()).await?;
 
-    let Some(current_song) = DbSong::last_played_song(&data.db).await? else {
+    let Some(current_song) = Songs::last_played(&data.db).await? else {
         ctx.send(
             CreateReply::default().embed(
                 CreateEmbed::new()
@@ -101,9 +95,7 @@ pub async fn playing(ctx: ApplicationContext<'_>) -> Result<(), Error> {
 pub async fn queue(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     let data = ctx.data;
 
-    if let Some(guild_id) = ctx.guild_id() {
-        update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
-    }
+    update_activity(data, ctx.author().id, ctx.channel_id()).await?;
 
     let mut comms = data.comms.lock().await;
     let requests = comms.song_requests().await?;
@@ -154,11 +146,11 @@ pub async fn search(
 ) -> Result<(), Error> {
     let data = ctx.data;
 
-    if let Some(guild_id) = ctx.guild_id() {
-        update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
-    }
+    update_activity(data, ctx.author().id, ctx.channel_id()).await?;
 
-    let suggestions = DbSong::search(&data.db, &search)
+    let user = Users::get_or_insert(ctx.author().id.get(), &data.db).await?;
+
+    let suggestions = Songs::search(&search, &data.db)
         .await?
         .into_iter()
         .take(20)
@@ -266,7 +258,7 @@ pub async fn search(
             .expect_or_log("Failed to request song")
     };
 
-    song.request(&data.db, ctx.author().id.get()).await?;
+    song.request(&user, &data.db).await?;
 
     let cooldown_time = chrono::Duration::seconds(5400);
     let over = chrono::Utc::now() + cooldown_time;
@@ -313,9 +305,8 @@ pub async fn request(
 ) -> Result<(), Error> {
     let data = ctx.data();
 
-    if let Some(guild_id) = ctx.guild_id() {
-        update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
-    }
+    update_activity(data, ctx.author().id, ctx.channel_id()).await?;
+    let user = Users::get_or_insert(ctx.author().id.get(), &data.db).await?;
 
     let user_cooldown = UserCooldownKey::new(ctx.author().id.get() as i64, "song_request");
     if let Some(over) = is_on_cooldown(&data.redis_pool, user_cooldown).await? {
@@ -328,7 +319,7 @@ pub async fn request(
         return Ok(());
     }
 
-    let song = DbSong::fetch_from_hash(&data.db, &song).await?;
+    let song = Songs::get_by_hash(&song, &data.db).await?;
 
     let Some(song) = song else {
         ctx.send(
@@ -340,7 +331,7 @@ pub async fn request(
         return Ok(());
     };
 
-    let Some(currently_playing) = DbSong::last_played_song(&data.db).await? else {
+    let Some(currently_playing) = Songs::last_played(&data.db).await? else {
         ctx.send(
             CreateReply::default()
                 .embed(
@@ -367,7 +358,7 @@ pub async fn request(
         return Ok(());
     }
 
-    let last_played = song.last_requested(&data.db).await?;
+    let last_played = SongRequests::get_last_requested_for_song(&song, &data.db).await?;
     let cooldown_time = if song.duration < 300.0 {
         chrono::Duration::seconds(1800)
     } else if song.duration < 600.0 {
@@ -405,7 +396,7 @@ pub async fn request(
             .expect_or_log("Failed to request song")
     };
 
-    song.request(&data.db, ctx.author().id.get()).await?;
+    song.request(&user, &data.db).await?;
 
     let cooldown_time = chrono::Duration::seconds(5400);
     let over = chrono::Utc::now() + cooldown_time;
@@ -449,12 +440,12 @@ pub async fn request(
         .next()
         .await
     {
-        let interaction_user = DbUser::fetch_or_insert(&data.db, mci.user.id.get() as i64).await?;
+        let interaction_user = Users::get_or_insert(mci.user.id.get(), &data.db).await?;
 
         match mci.data.custom_id.as_ref() {
             "song_request_favourite" => {
                 interaction_user
-                    .mark_as_favourite(&song.file_hash, &data.db)
+                    .favourite_song(&song, &data.db)
                     .await
                     .expect_or_log("Failed to mark as favourite");
                 mci.create_response(
@@ -469,7 +460,7 @@ pub async fn request(
             }
             "song_request_unfavourite" => {
                 interaction_user
-                    .mark_as_unfavourited(&song.file_hash, &data.db)
+                    .unfavourite_song(&song, &data.db)
                     .await
                     .expect_or_log("Failed to unmark as favourite");
                 mci.create_response(

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased] - 2024-05-03
 
+### Changed
+
+- Migrated from sqlx to SeaORM
+
 ### Fixed
 
 - Fixed the slot machine showing "you lost" even though there was a payout

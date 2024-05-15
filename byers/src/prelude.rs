@@ -22,7 +22,7 @@ pub struct Data<C>
 where
     C: LiquidsoapCommunication,
 {
-    pub db: judeharley::PgPool,
+    pub db: judeharley::sea_orm::DatabaseConnection,
     pub comms: Arc<Mutex<C>>,
     pub redis_pool: fred::pool::RedisPool,
     pub redis_subscriber: fred::clients::SubscriberClient,
