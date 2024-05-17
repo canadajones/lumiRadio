@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use async_trait::async_trait;
+use judeharley::controllers::users::UpdateParams;
 use poise::serenity_prelude::CreateEmbed;
 use poise::CreateReply;
 use rand::seq::SliceRandom;
@@ -12,8 +13,8 @@ use crate::{commands::minigames::Minigame, event_handlers::message::update_activ
 use judeharley::{
     communication::ByersUnixStream,
     cooldowns::{is_on_cooldown, set_cooldown, UserCooldownKey},
-    db::DbUser,
     prelude::DiscordTimestamp,
+    Users,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, Hash)]
@@ -290,9 +291,7 @@ pub async fn slots(
 ) -> Result<(), Error> {
     let data = ctx.data();
 
-    if let Some(guild_id) = ctx.guild_id() {
-        update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
-    }
+    update_activity(data, ctx.author().id, ctx.channel_id()).await?;
 
     let user_cooldown = UserCooldownKey::new(ctx.author().id.get() as i64, "slots");
     if let Some(over) = is_on_cooldown(&data.redis_pool, user_cooldown).await? {
@@ -306,7 +305,7 @@ pub async fn slots(
         return Ok(());
     }
 
-    let mut user = DbUser::fetch_or_insert(&data.db, ctx.author().id.get() as i64).await?;
+    let user = Users::get_or_insert(ctx.author().id.get(), &data.db).await?;
     if user.boonbucks < bet {
         ctx.send(CreateReply::default().embed(
             NewSlots::prepare_embed().description("You need at least 1 Boondollar to play slots"),
@@ -314,14 +313,20 @@ pub async fn slots(
         .await?;
         return Ok(());
     }
-    user.boonbucks -= bet;
-    user.update(&data.db).await?;
-    // server_config.slot_jackpot += 5;
-    // server_config.update(&data.db).await?;
+
+    let new_boonbucks = user.boonbucks - bet;
+    let user = user
+        .update(
+            UpdateParams {
+                boonbucks: Some(new_boonbucks as u32),
+                ..Default::default()
+            },
+            &data.db,
+        )
+        .await?;
 
     let machine = NewSlots;
     let (payout, reels) = machine.play().await?;
-    // let jackpot = server_config.slot_jackpot;
     let Some(payout) = payout else {
         ctx.send(
             CreateReply::default().embed(
@@ -404,8 +409,15 @@ pub async fn slots(
         .await?;
     }
 
-    user.boonbucks += payout as i32 * bet;
-    user.update(&data.db).await?;
+    let new_boonbucks = user.boonbucks + payout as i32 * bet;
+    user.update(
+        UpdateParams {
+            boonbucks: Some(new_boonbucks as u32),
+            ..Default::default()
+        },
+        &data.db,
+    )
+    .await?;
 
     set_cooldown(&data.redis_pool, user_cooldown, 5 * 60).await?;
 
