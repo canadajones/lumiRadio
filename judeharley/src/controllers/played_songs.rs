@@ -86,7 +86,7 @@ impl Model {
             .map(|s| s.try_into().unwrap())
     }
 
-    pub async fn count(song: &SongModel, db: &DatabaseConnection) -> Result<u64, JudeHarleyError> {
+    pub async fn count(song: &SongModel, db: &DatabaseConnection) -> Result<i64, JudeHarleyError> {
         Entity::find()
             .select_only()
             .column_as(Column::Id.count(), "count")

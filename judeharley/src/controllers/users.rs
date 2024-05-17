@@ -41,7 +41,7 @@ pub struct UpdateParams {
 
 #[derive(FromQueryResult)]
 struct UserCount {
-    count: i32,
+    count: i64,
 }
 
 impl Model {
@@ -77,7 +77,7 @@ impl Model {
             .map_err(Into::into)
     }
 
-    pub async fn hour_position(&self, db: &DatabaseConnection) -> Result<i32, JudeHarleyError> {
+    pub async fn hour_position(&self, db: &DatabaseConnection) -> Result<i64, JudeHarleyError> {
         Entity::find()
             .select_only()
             .column_as(Column::Id.count(), "count")
@@ -92,7 +92,7 @@ impl Model {
     pub async fn boondollar_position(
         &self,
         db: &DatabaseConnection,
-    ) -> Result<i32, JudeHarleyError> {
+    ) -> Result<i64, JudeHarleyError> {
         Entity::find()
             .select_only()
             .column_as(Column::Boonbucks.count(), "count")
@@ -104,7 +104,7 @@ impl Model {
             .map(|count| count.map(|c| c.count + 1).unwrap_or(1))
     }
 
-    pub async fn cans(&self, db: &DatabaseConnection) -> Result<u64, JudeHarleyError> {
+    pub async fn cans(&self, db: &DatabaseConnection) -> Result<i64, JudeHarleyError> {
         self.find_related(Can)
             .select_only()
             .column_as(CanColumn::Id.count(), "count")

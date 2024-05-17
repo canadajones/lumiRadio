@@ -10,7 +10,7 @@ use crate::JudeHarleyError;
 
 #[derive(FromQueryResult)]
 struct CanCount {
-    count: u64,
+    count: i64,
 }
 
 impl Model {
@@ -32,7 +32,7 @@ impl Model {
 
     pub async fn insert_n(
         added_by: &UserModel,
-        amount: u64,
+        amount: i64,
         db: &DatabaseConnection,
     ) -> Result<(), JudeHarleyError> {
         let mut cans = Vec::new();
@@ -53,7 +53,7 @@ impl Model {
         Ok(())
     }
 
-    pub async fn count(db: &DatabaseConnection) -> Result<u64, JudeHarleyError> {
+    pub async fn count(db: &DatabaseConnection) -> Result<i64, JudeHarleyError> {
         let count = Entity::find()
             .select_only()
             .column_as(Column::Id.count(), "count")
@@ -65,12 +65,12 @@ impl Model {
     }
 
     pub async fn remove_last_n(
-        amount: u64,
+        amount: i64,
         db: &DatabaseConnection,
     ) -> Result<(), JudeHarleyError> {
         let current = Self::count(db).await?;
 
-        if amount > current {
+        if amount > current && amount > 0 {
             return Ok(());
         }
 
@@ -86,10 +86,14 @@ impl Model {
 
     pub async fn set(
         added_by: &UserModel,
-        amount: u64,
+        amount: i64,
         db: &DatabaseConnection,
     ) -> Result<(), JudeHarleyError> {
         let current = Self::count(db).await?;
+
+        if amount < 0 {
+            return Ok(());
+        }
 
         if amount <= current {
             Self::remove_last_n(current - amount, db)

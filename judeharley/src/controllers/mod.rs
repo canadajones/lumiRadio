@@ -16,5 +16,5 @@ pub mod users;
 
 #[derive(FromQueryResult)]
 pub struct CountQuery {
-    pub count: u64,
+    pub count: i64,
 }

@@ -36,7 +36,7 @@ pub async fn set_can_count(ctx: ApplicationContext<'_>, can_count: i32) -> Resul
     let data = ctx.data;
 
     let user = Users::get_or_insert(ctx.author().id.get(), &data.db).await?;
-    Cans::set(&user, can_count as u64, &data.db).await?;
+    Cans::set(&user, can_count as i64, &data.db).await?;
 
     ctx.send(
         CreateReply::default().embed(

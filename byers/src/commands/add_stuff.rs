@@ -10,7 +10,7 @@ pub async fn add(_: ApplicationContext<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-fn can_name(prefix: &str, number_of_cans: u64) -> String {
+fn can_name(prefix: &str, number_of_cans: i64) -> String {
     match number_of_cans {
         (0..=49_999) => format!("{prefix} Town"),
         (50_000..=999_999) => format!("{prefix} City"),

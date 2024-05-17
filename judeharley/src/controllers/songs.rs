@@ -174,11 +174,11 @@ impl Model {
             .map(|t| t.map(|t| t.value))
     }
 
-    pub async fn played(&self, db: &DatabaseConnection) -> Result<u64, JudeHarleyError> {
+    pub async fn played(&self, db: &DatabaseConnection) -> Result<i64, JudeHarleyError> {
         PlayedModel::count(self, db).await
     }
 
-    pub async fn requested(&self, db: &DatabaseConnection) -> Result<u64, JudeHarleyError> {
+    pub async fn requested(&self, db: &DatabaseConnection) -> Result<i64, JudeHarleyError> {
         RequestModel::count(self, db).await
     }
 
