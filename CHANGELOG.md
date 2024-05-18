@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning].
 
 ## [Unreleased] - 2024-05-03
 
+### Added
+
+- Implemented Sentry into Byers to catch errors
+
 ### Changed
 
 - Migrated from sqlx to SeaORM
@@ -316,3 +320,5 @@ and this project adheres to [Semantic Versioning].
 [1.1.6]: https://github.com/LumiRadio/lumiRadio/compare/v1.1.5..v1.1.6
 [1.1.7]: https://github.com/LumiRadio/lumiRadio/compare/v1.1.6..v1.1.7
 [1.1.8]: https://github.com/LumiRadio/lumiRadio/compare/v1.1.7..v1.1.8
+[1.1.9]: https://github.com/LumiRadio/lumiRadio/compare/v1.1.8..v1.1.9
+[1.2.0]: https://github.com/LumiRadio/lumiRadio/compare/v1.1.9..v1.2.0
