@@ -11,9 +11,7 @@ pub async fn what_song(
 ) -> Result<(), Error> {
     let data = ctx.data();
 
-    let song = PlayedSongs::get_playing_at(message.timestamp.naive_utc(), &data.db)
-        .await
-        .expect_or_log("Failed to query database");
+    let song = PlayedSongs::get_playing_at(message.timestamp.naive_utc(), &data.db).await?;
     let Some(song) = song else {
         ctx.send(
             CreateReply::default().embed(CreateEmbed::new().title("No song found").description(

@@ -66,6 +66,8 @@ services:
       DISCORD__EMOJI__D6_4: ${DICE_FOUR_EMOJI:-<:d6_4:1193962769217761330>}
       DISCORD__EMOJI__D6_5: ${DICE_FIVE_EMOJI:-<:d6_5:1193962768097869834>}
       DISCORD__EMOJI__D6_6: ${DICE_SIX_EMOJI:-<:d6_6:1193962765937823805>}
+      # SENTRY_DSN: ${SENTRY_DSN}
+      # RUST_BACKTRACE: 1
     volumes:
       - ls_socket:/usr/src/app/ls
       - ${RADIO_MUSIC:?RADIO_MUSIC is unset}:/music

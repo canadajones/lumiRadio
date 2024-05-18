@@ -248,14 +248,11 @@ pub async fn search(
 
             song.file_hash == values[0]
         })
-        .expect_or_log("Failed to find song");
+        .ok_or(anyhow::anyhow!("Failed to find song"))?;
 
     let _ = {
         let mut comms = data.comms.lock().await;
-        comms
-            .request_song(&song.file_path)
-            .await
-            .expect_or_log("Failed to request song")
+        comms.request_song(&song.file_path).await?
     };
 
     song.request(&user, &data.db).await?;
@@ -390,10 +387,7 @@ pub async fn request(
 
     let _ = {
         let mut comms = data.comms.lock().await;
-        comms
-            .request_song(&song.file_path)
-            .await
-            .expect_or_log("Failed to request song")
+        comms.request_song(&song.file_path).await?
     };
 
     song.request(&user, &data.db).await?;
@@ -444,10 +438,7 @@ pub async fn request(
 
         match mci.data.custom_id.as_ref() {
             "song_request_favourite" => {
-                interaction_user
-                    .favourite_song(&song, &data.db)
-                    .await
-                    .expect_or_log("Failed to mark as favourite");
+                interaction_user.favourite_song(&song, &data.db).await?;
                 mci.create_response(
                     ctx.serenity_context(),
                     CreateInteractionResponse::Message(
@@ -459,10 +450,7 @@ pub async fn request(
                 .await?;
             }
             "song_request_unfavourite" => {
-                interaction_user
-                    .unfavourite_song(&song, &data.db)
-                    .await
-                    .expect_or_log("Failed to unmark as favourite");
+                interaction_user.unfavourite_song(&song, &data.db).await?;
                 mci.create_response(
                     ctx.serenity_context(),
                     CreateInteractionResponse::Message(
