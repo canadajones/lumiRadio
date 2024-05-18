@@ -7,7 +7,6 @@ use poise::serenity_prelude::{
     CreateSelectMenuKind, CreateSelectMenuOption,
 };
 use poise::CreateReply;
-use tracing_unwrap::{OptionExt, ResultExt};
 
 use crate::commands::autocomplete_songs;
 use crate::event_handlers::message::update_activity;

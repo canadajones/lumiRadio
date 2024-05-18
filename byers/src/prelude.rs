@@ -1,9 +1,9 @@
-use poise::serenity_prelude::{self as serenity, ResolvedValue};
-use sentry::{Breadcrumb, IntoBreadcrumbs};
+use poise::serenity_prelude as serenity;
+use sentry::Breadcrumb;
 use serde_json::json;
 use serenity::GatewayIntents;
 
-use std::{collections::HashMap, sync::Arc, time::SystemTime};
+use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use tokio::sync::Mutex;
