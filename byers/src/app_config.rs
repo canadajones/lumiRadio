@@ -1,5 +1,9 @@
 use serde::Deserialize;
 
+fn default_environment() -> String {
+    "development".into()
+}
+
 #[derive(Deserialize, Debug)]
 pub struct AppConfig {
     pub discord_token: String,
@@ -8,6 +12,12 @@ pub struct AppConfig {
 
     pub discord: DiscordConfig,
     pub secret: String,
+
+    pub sentry_dsn: Option<String>,
+    #[serde(default = "default_environment")]
+    pub environment: String,
+    #[serde(default = "Default::default")]
+    pub sentry_debug: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]

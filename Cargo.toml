@@ -9,3 +9,6 @@ edition = "2021"
 
 [workspace.dependencies]
 judeharley = { git = "https://github.com/lumiRadio/lumiRadio" }
+
+[profile.release.package.byers]
+debug = true
