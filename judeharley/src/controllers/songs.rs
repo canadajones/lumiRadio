@@ -160,6 +160,30 @@ impl Model {
         .map_err(Into::into)
     }
 
+    pub async fn search_favourited_songs(
+        query: &str,
+        user: &UserModel,
+        db: &DatabaseConnection,
+    ) -> Result<Vec<Self>, JudeHarleyError> {
+        Model::find_by_statement(Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Postgres,
+            r#"
+            WITH search AS (
+                SELECT to_tsquery(string_agg(lexeme || ':*', ' & ' ORDER BY positions)) AS query
+                FROM unnest(to_tsvector($1))
+            )
+            SELECT title, artist, album, file_path, duration, file_hash, bitrate
+            FROM search, favourite_songs
+            JOIN songs ON favourite_songs.song_id = songs.file_hash
+            WHERE favourite_songs.user_id = $2 AND tsvector @@ query
+            "#,
+            [query.into(), user.id.into()],
+        ))
+        .all(db)
+        .await
+        .map_err(Into::into)
+    }
+
     pub async fn tags(&self, db: &DatabaseConnection) -> Result<Vec<TagsModel>, JudeHarleyError> {
         TagsModel::get_by_song(self, db).await
     }

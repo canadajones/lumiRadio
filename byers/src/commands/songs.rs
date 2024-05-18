@@ -8,7 +8,7 @@ use poise::serenity_prelude::{
 };
 use poise::CreateReply;
 
-use crate::commands::autocomplete_songs;
+use crate::commands::{autocomplete_favourite_songs, autocomplete_songs};
 use crate::event_handlers::message::update_activity;
 use crate::prelude::*;
 use judeharley::{
@@ -20,7 +20,16 @@ use judeharley::{
 /// Song-related commands
 #[poise::command(
     slash_command,
-    subcommands("request", "playing", "history", "queue", "search"),
+    subcommands(
+        "request",
+        "playing",
+        "history",
+        "queue",
+        "search",
+        "favourite",
+        "unfavourite",
+        "request_favourite"
+    ),
     subcommand_required
 )]
 pub async fn song(_: ApplicationContext<'_>) -> Result<(), Error> {
@@ -48,6 +57,76 @@ pub async fn history(ctx: ApplicationContext<'_>) -> Result<(), Error> {
             CreateEmbed::new()
                 .title("Song History")
                 .description(format!("```\n{}\n```", description)),
+        ),
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Marks the current song as a favourite song
+#[poise::command(slash_command, ephemeral)]
+pub async fn favourite(ctx: ApplicationContext<'_>) -> Result<(), Error> {
+    let data = ctx.data;
+
+    update_activity(data, ctx.author().id, ctx.channel_id()).await?;
+
+    let user = Users::get_or_insert(ctx.author().id.get(), &data.db).await?;
+    let Some(song) = Songs::last_played(&data.db).await? else {
+        ctx.send(
+            CreateReply::default().embed(
+                CreateEmbed::new()
+                    .title("Song Requests")
+                    .description("Nothing is currently playing!"),
+            ),
+        )
+        .await?;
+        return Ok(());
+    };
+
+    user.favourite_song(&song, &data.db).await?;
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Song Requests")
+                .description("Marked the currently playing song as favourite!"),
+        ),
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Unfavourites the specified song
+#[poise::command(slash_command, ephemeral)]
+pub async fn unfavourite(
+    ctx: ApplicationContext<'_>,
+    #[description = "The song to unfavourite"]
+    #[rest]
+    #[autocomplete = "autocomplete_favourite_songs"]
+    song: String,
+) -> Result<(), Error> {
+    let data = ctx.data;
+    let user = Users::get_or_insert(ctx.author().id.get(), &data.db).await?;
+
+    let Some(song) = Songs::get_by_hash(&song, &data.db).await? else {
+        ctx.send(
+            CreateReply::default().embed(
+                CreateEmbed::new()
+                    .title("Song Requests")
+                    .description("Could not find that song!"),
+            ),
+        )
+        .await?;
+        return Ok(());
+    };
+
+    user.unfavourite_song(&song, &data.db).await?;
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::new()
+                .title("Song Requests")
+                .description("Unmarked the currently playing song as favourite!"),
         ),
     )
     .await?;
@@ -290,15 +369,7 @@ pub async fn search(
     Ok(())
 }
 
-/// Requests a song for the radio
-#[poise::command(slash_command)]
-pub async fn request(
-    ctx: ApplicationContext<'_>,
-    #[description = "The song to request"]
-    #[rest]
-    #[autocomplete = "autocomplete_songs"]
-    song: String,
-) -> Result<(), Error> {
+async fn request_song(ctx: ApplicationContext<'_>, song: String) -> Result<(), Error> {
     let data = ctx.data();
 
     update_activity(data, ctx.author().id, ctx.channel_id()).await?;
@@ -465,4 +536,28 @@ pub async fn request(
     }
 
     Ok(())
+}
+
+/// Requests a song for the radio from your favourites
+#[poise::command(slash_command)]
+pub async fn request_favourite(
+    ctx: ApplicationContext<'_>,
+    #[description = "The song to request"]
+    #[rest]
+    #[autocomplete = "autocomplete_favourite_songs"]
+    song: String,
+) -> Result<(), Error> {
+    request_song(ctx, song).await
+}
+
+/// Requests a song for the radio
+#[poise::command(slash_command)]
+pub async fn request(
+    ctx: ApplicationContext<'_>,
+    #[description = "The song to request"]
+    #[rest]
+    #[autocomplete = "autocomplete_songs"]
+    song: String,
+) -> Result<(), Error> {
+    request_song(ctx, song).await
 }

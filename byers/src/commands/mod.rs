@@ -5,7 +5,7 @@ use tracing_unwrap::ResultExt;
 use crate::event_handlers::message::update_activity;
 use crate::prelude::*;
 use ellipse::Ellipse;
-use judeharley::Songs;
+use judeharley::{Songs, Users};
 
 pub mod add_stuff;
 pub mod admin;
@@ -51,6 +51,29 @@ pub async fn autocomplete_songs(
     let data = ctx.data();
 
     let songs = Songs::search(partial, &data.db)
+        .await
+        .expect_or_log("Failed to query database");
+
+    songs.into_iter().take(20).map(|song| {
+        AutocompleteChoice::new(
+            format!("{} - {}", song.artist, song.title)
+                .as_str()
+                .truncate_ellipse(97),
+            song.file_hash,
+        )
+    })
+}
+
+pub async fn autocomplete_favourite_songs(
+    ctx: Context<'_>,
+    partial: &str,
+) -> impl Iterator<Item = poise::serenity_prelude::AutocompleteChoice> {
+    let data = ctx.data();
+    let user = Users::get_or_insert(ctx.author().id.get(), &data.db)
+        .await
+        .expect_or_log("Failed to query database");
+
+    let songs = Songs::search_favourited_songs(partial, &user, &data.db)
         .await
         .expect_or_log("Failed to query database");
 

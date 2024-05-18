@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning].
 ### Added
 
 - Implemented Sentry into Byers to catch errors
+- Added `/song favourite` to favourite the currently playing song
+- Added `/song unfavourite` to unfavourite the specified song
+- Added `/song request_favourite` to search and request one of your favourited songs
 
 ### Changed
 
