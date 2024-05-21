@@ -149,13 +149,10 @@ impl SlotMachine {
         let reel_3 = self.reels[2].spin();
         let reel = [reel_1, reel_2, reel_3];
 
-        let symbol_counts =
-            reel.iter()
-                .filter(|s| !s.is_bar())
-                .fold(HashMap::new(), |mut acc, s| {
-                    *acc.entry(s).or_insert(0) += 1;
-                    acc
-                });
+        let symbol_counts = reel.iter().fold(HashMap::new(), |mut acc, s| {
+            *acc.entry(s).or_insert(0) += 1;
+            acc
+        });
 
         if *symbol_counts
             .get(&ReelSymbol::Symbol(SlotSymbols::Jackpot))

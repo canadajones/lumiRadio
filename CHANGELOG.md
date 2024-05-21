@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning].
 
 - Fixed the slot machine showing "you lost" even though there was a payout
 - Fixed Byers not actually giving people its lunch money when it loses
+- Fixed the slot machine incorrectly ignoring proper payout of Bar symbols
 
 ## [1.2.0] - 2024-05-03
 
