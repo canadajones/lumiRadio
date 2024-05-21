@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning].
 - Fixed Byers not actually giving people its lunch money when it loses
 - Fixed the slot machine incorrectly ignoring proper payout of Bar symbols
 
+## [1.2.1] - 2024-05-03
+
+### Fixed
+
+- Fixed the slot machine not working
+- Fixed the slot machine description having the wrong indents
+
 ## [1.2.0] - 2024-05-03
 
 ### Added
@@ -326,4 +333,5 @@ and this project adheres to [Semantic Versioning].
 [1.1.8]: https://github.com/LumiRadio/lumiRadio/compare/v1.1.7..v1.1.8
 [1.1.9]: https://github.com/LumiRadio/lumiRadio/compare/v1.1.8..v1.1.9
 [1.2.0]: https://github.com/LumiRadio/lumiRadio/compare/v1.1.9..v1.2.0
+[1.2.1]: https://github.com/LumiRadio/lumiRadio/compare/v1.2.0..v1.2.1
 [1.3.0]: https://github.com/LumiRadio/lumiRadio/compare/v1.2.0..v1.3.0

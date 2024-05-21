@@ -143,6 +143,7 @@ async fn main() {
         )),
         redis_pool: redis_pool.clone(),
         redis_subscriber: subscriber_client.clone(),
+        emoji: config.discord.emoji.clone(),
     };
 
     let framework = poise::Framework::builder()

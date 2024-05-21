@@ -24,6 +24,18 @@ pub struct AppConfig {
 pub struct DiscordConfig {
     pub client_id: String,
     pub client_secret: String,
+
+    pub emoji: EmojiConfig,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct EmojiConfig {
+    pub d6_1: String,
+    pub d6_2: String,
+    pub d6_3: String,
+    pub d6_4: String,
+    pub d6_5: String,
+    pub d6_6: String,
 }
 
 impl AppConfig {

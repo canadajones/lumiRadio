@@ -8,6 +8,7 @@ use std::sync::Arc;
 use lazy_static::lazy_static;
 use tokio::sync::Mutex;
 
+use crate::app_config::{EmojiConfig, GoogleConfig};
 use judeharley::communication::{ByersUnixStream, LiquidsoapCommunication};
 
 lazy_static! {
@@ -28,6 +29,7 @@ where
     pub comms: Arc<Mutex<C>>,
     pub redis_pool: fred::pool::RedisPool,
     pub redis_subscriber: fred::clients::SubscriberClient,
+    pub emoji: EmojiConfig,
 }
 
 pub struct BreadcrumbableContext<'a>(pub Context<'a>);
