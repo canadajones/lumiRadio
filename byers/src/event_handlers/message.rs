@@ -9,9 +9,8 @@ use tracing::info;
 use crate::prelude::*;
 use judeharley::{
     communication::ByersUnixStream,
-    controllers::users::UpdateParams,
     prelude::Users,
-    sea_orm::{prelude::Decimal, DatabaseConnection},
+    sea_orm::{ActiveValue, DatabaseConnection, Set},
     ServerChannelConfig,
 };
 
@@ -38,8 +37,8 @@ impl UserMessageHandlerExt for Users {
             info!("User {} sent their first message", self.id);
             let last_message_sent = Some(chrono::Utc::now().naive_utc());
             self.update(
-                UpdateParams {
-                    last_message_sent,
+                judeharley::entities::users::ActiveModel {
+                    last_message_sent: last_message_sent.map_or(ActiveValue::not_set(), |t| Set(Some(t))),
                     ..Default::default()
                 },
                 db,
@@ -58,17 +57,16 @@ impl UserMessageHandlerExt for Users {
                 );
 
                 Some(
-                    self.watched_time
-                        + Decimal::from(time_diff.num_seconds()) / Decimal::from(3600),
+                    self.watched_time + time_diff.num_seconds(),
                 )
             } else {
                 None
             };
 
             self.update(
-                UpdateParams {
-                    last_message_sent,
-                    watched_time,
+                judeharley::entities::users::ActiveModel {
+                    last_message_sent: last_message_sent.map_or(ActiveValue::not_set(), |t| Set(Some(t))),
+                    watched_time: watched_time.map_or(ActiveValue::not_set(), Set),
                     ..Default::default()
                 },
                 db,
@@ -109,8 +107,8 @@ impl UserMessageHandlerExt for Users {
 
         let new_boonbucks = self.boonbucks + 3;
         self.update(
-            UpdateParams {
-                boonbucks: Some(new_boonbucks as u32),
+            judeharley::entities::users::ActiveModel {
+                boonbucks: Set(new_boonbucks),
                 ..Default::default()
             },
             db,
