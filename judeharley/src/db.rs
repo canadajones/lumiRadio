@@ -588,7 +588,7 @@ impl DbUser {
             SELECT 1 AS has_favourited FROM favourite_songs
             WHERE user_id = $1 AND song_id = $2
             "#,
-            self.id as i32,
+            self.id,
             song_id
         )
         .fetch_optional(db)
@@ -623,7 +623,7 @@ impl DbUser {
             DELETE FROM favourite_songs
             WHERE user_id = $1 AND song_id = $2
             "#,
-            self.id as i32,
+            self.id,
             song_id
         )
         .execute(db)

@@ -10,10 +10,7 @@ use situwaition::{
 use tracing::error;
 
 use crate::{event_handlers::message::update_activity, prelude::*};
-use judeharley::{
-    db::{DbSlcbUser, DbUser},
-    BigDecimal,
-};
+use judeharley::{sea_orm::Set, SlcbCurrency, Users};
 
 /// Commands related to importing data from YouTube
 #[poise::command(slash_command, subcommands("link"))]
@@ -34,11 +31,9 @@ enum YoutubeError {
 pub async fn link(ctx: ApplicationContext<'_>) -> Result<(), Error> {
     let data = ctx.data();
 
-    if let Some(guild_id) = ctx.guild_id() {
-        update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
-    }
+    update_activity(data, ctx.author().id, ctx.channel_id()).await?;
 
-    let mut user = DbUser::fetch_or_insert(&data.db, ctx.author().id.get() as i64).await?;
+    let user = Users::get_or_insert(ctx.author().id.get(), &data.db).await?;
 
     if user.migrated {
         ctx.send(
@@ -94,6 +89,7 @@ If you don't remember your old YouTube name or you no longer have access to your
         SituwaitionOptsBuilder::default()
             .timeout(Duration::from_secs(120))
             .check_interval(Duration::from_secs(1))
+            .check_cooldown(None)
             .build()
             .unwrap(),
     )
@@ -148,7 +144,7 @@ If you don't remember your old YouTube name or you no longer have access to your
     let mut slcb_account = None;
     for youtube_channel in channels {
         if let Some(account) =
-            DbSlcbUser::fetch_by_user_id(&data.db, &youtube_channel.youtube_channel_id).await?
+            SlcbCurrency::get_by_user_id(&youtube_channel.youtube_channel_id, &data.db).await?
         {
             slcb_account = Some(account);
             break;
@@ -169,19 +165,19 @@ If you don't remember your old YouTube name or you no longer have access to your
         return Ok(());
     };
 
-    user.watched_time += BigDecimal::from(slcb_account.hours);
-    user.boonbucks += slcb_account.points;
-    user.migrated = true;
+    let new_watch_time = user.watched_time + slcb_account.hours as i64 * 3600;
+    let new_boonbucks = user.boonbucks + slcb_account.points;
+    user.update(
+        judeharley::entities::users::ActiveModel {
+            watched_time: Set(new_watch_time),
+            boonbucks: Set(new_boonbucks),
+            migrated: Set(true),
+            ..Default::default()
+        },
+        &data.db,
+    )
+    .await?;
 
-    user.update(&data.db).await?;
-
-    // b.embed(|e| {
-    //     e.title("Successfully imported data!").description(format!(
-    //         "Successfully imported data from {}!",
-    //         slcb_account.username
-    //     ))
-    // })
-    // .components(|c| c)
     handle
         .edit(
             Context::Application(ctx),

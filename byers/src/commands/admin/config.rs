@@ -4,7 +4,9 @@ use poise::{
 };
 
 use crate::prelude::*;
-use judeharley::db::{DbCan, DbServerChannelConfig, DbServerConfig, DbServerRoleConfig, DbUser};
+use judeharley::{
+    sea_orm::Set, Cans, ServerChannelConfig, ServerConfig, ServerRoleConfig, Users
+};
 
 /// Configuration-related commands
 #[poise::command(
@@ -29,7 +31,8 @@ pub async fn config(_: ApplicationContext<'_>) -> Result<(), Error> {
 pub async fn set_can_count(ctx: ApplicationContext<'_>, can_count: i32) -> Result<(), Error> {
     let data = ctx.data;
 
-    DbCan::set(&data.db, ctx.author().id.get() as i64, can_count).await?;
+    let user = Users::get_or_insert(ctx.author().id.get(), &data.db).await?;
+    Cans::set(&user, can_count as i64, &data.db).await?;
 
     ctx.send(
         CreateReply::default().embed(
@@ -48,10 +51,17 @@ pub async fn set_can_count(ctx: ApplicationContext<'_>, can_count: i32) -> Resul
 pub async fn set_quest_roll(ctx: ApplicationContext<'_>, roll: i32) -> Result<(), Error> {
     let data = ctx.data;
 
-    let mut server_config =
-        DbServerConfig::fetch_or_insert(&data.db, ctx.guild_id().unwrap().get() as i64).await?;
-    server_config.dice_roll = roll;
-    server_config.update(&data.db).await?;
+    let server_config =
+        ServerConfig::get_or_insert(ctx.guild_id().unwrap().get(), &data.db).await?;
+    server_config
+        .update(
+            judeharley::entities::server_config::ActiveModel {
+                dice_roll: Set(roll),
+                ..Default::default()
+            },
+            &data.db,
+        )
+        .await?;
 
     ctx.send(
         CreateReply::default().embed(
@@ -77,7 +87,17 @@ pub async fn manage_role(
     let data = ctx.data;
     let guild_id = ctx.guild_id().unwrap();
 
-    DbServerRoleConfig::upsert(&data.db, guild_id.get() as i64, role.id.get() as i64, hours)
+    let role_config =
+        ServerRoleConfig::get_or_insert(role.id.get(), guild_id.get(), hours as u32, &data.db)
+            .await?;
+    role_config
+        .update(
+            judeharley::entities::server_role_config::ActiveModel {
+                minimum_hours: Set(hours),
+                ..Default::default()
+            },
+            &data.db,
+        )
         .await?;
     let handle = ctx
         .send(
@@ -91,7 +111,7 @@ pub async fn manage_role(
         )
         .await?;
 
-    let users = DbUser::fetch_by_minimum_hours(&data.db, hours).await?;
+    let users = Users::get_with_at_least_n_hours(hours, &data.db).await?;
     for user in users {
         let user_id = UserId::new(user.id as u64);
         let member = guild_id.member(&ctx.serenity_context(), user_id).await?;
@@ -128,8 +148,7 @@ pub async fn delete_role_config(
     let data = ctx.data;
     let guild_id = ctx.guild_id().unwrap();
 
-    DbServerRoleConfig::delete_by_guild_role(&data.db, guild_id.get() as i64, role.id.get() as i64)
-        .await?;
+    ServerRoleConfig::delete_by_role(role.id.get(), guild_id.get(), &data.db).await?;
     ctx.send(
         CreateReply::default().embed(
             CreateEmbed::new()
@@ -154,16 +173,15 @@ pub async fn manage_channel(
 ) -> Result<(), Error> {
     let data = ctx.data;
 
-    let mut channel_config = DbServerChannelConfig::fetch_or_insert(
-        &data.db,
-        channel.id().get() as i64,
-        ctx.guild_id().unwrap().get() as i64,
-    )
-    .await?;
-    channel_config.allow_point_accumulation = allow_point_accumulation;
-    channel_config.allow_watch_time_accumulation = allow_watch_time_accumulation;
-    channel_config.hydration_reminder = hydration_reminder;
-    channel_config.update(&data.db).await?;
+    let channel_config = ServerChannelConfig::get_or_insert(channel.id().get(), &data.db).await?;
+    
+
+    channel_config.update(judeharley::entities::server_channel_config::ActiveModel {
+        allow_point_accumulation: Set(allow_point_accumulation),
+        allow_watch_time_accumulation: Set(allow_watch_time_accumulation),
+        hydration_reminder: Set(hydration_reminder),
+        ..Default::default()
+    }, &data.db).await?;
 
     ctx.send(
         CreateReply::default().embed(

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use fred::prelude::{ClientLike, PubsubInterface};
 use poise::serenity_prelude as serenity;
 use poise::PrefixFrameworkOptions;
@@ -35,6 +37,23 @@ async fn main() {
 
     info!("Loading config from environment...");
     let config = crate::app_config::AppConfig::from_env();
+
+    let _guard = if let Some(sentry_dsn) = &config.sentry_dsn {
+        info!("Initializing Sentry...");
+        let guard = sentry::init(sentry::ClientOptions {
+            environment: Some(config.environment.clone().into()),
+            dsn: Some(
+                sentry::types::Dsn::from_str(sentry_dsn)
+                    .expect_or_log("failed to parse Sentry DSN"),
+            ),
+            ..Default::default()
+        });
+
+        Some(guard)
+    } else {
+        None
+    };
+
     let commands = vec![
         help(),
         song(),
@@ -126,6 +145,7 @@ async fn main() {
         )),
         redis_pool: redis_pool.clone(),
         redis_subscriber: subscriber_client.clone(),
+        emoji: config.discord.emoji.clone(),
     };
 
     let framework = poise::Framework::builder()

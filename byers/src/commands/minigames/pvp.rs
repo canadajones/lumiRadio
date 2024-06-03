@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use judeharley::sea_orm::Set;
 use poise::serenity_prelude::{
     ButtonStyle, CreateActionRow, CreateButton, CreateInteractionResponse,
     CreateInteractionResponseMessage, Mentionable, User,
@@ -13,8 +14,8 @@ use crate::{commands::minigames::Minigame, event_handlers::message::update_activ
 use judeharley::{
     communication::ByersUnixStream,
     cooldowns::{is_on_cooldown, set_cooldown, UserCooldownKey},
-    db::{DbServerConfig, DbUser},
     prelude::DiscordTimestamp,
+    ServerConfig, Users,
 };
 
 pub enum PvPResult {
@@ -51,14 +52,12 @@ impl Minigame for PvP {
 async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error> {
     let data = ctx.data;
 
-    if let Some(guild_id) = ctx.guild_id() {
-        update_activity(data, ctx.author().id, ctx.channel_id(), guild_id).await?;
-    }
+    update_activity(data, ctx.author().id, ctx.channel_id()).await?;
 
-    let mut challenger = DbUser::fetch_or_insert(&data.db, ctx.author().id.get() as i64).await?;
-    let mut challenged = DbUser::fetch_or_insert(&data.db, user.id.get() as i64).await?;
-    let mut server_config =
-        DbServerConfig::fetch_or_insert(&data.db, ctx.guild_id().unwrap().get() as i64).await?;
+    let challenger = Users::get_or_insert(ctx.author().id.get(), &data.db).await?;
+    let challenged = Users::get_or_insert(user.id.get(), &data.db).await?;
+    let server_config =
+        ServerConfig::get_or_insert(ctx.guild_id().unwrap().get(), &data.db).await?;
 
     let challenger_key = UserCooldownKey::new(challenger.id, "pvp");
     let challenged_key = UserCooldownKey::new(challenged.id, "pvp");
@@ -81,21 +80,41 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
         let bot_won = rand::random::<f64>() < 0.9;
 
         if bot_won {
+            let cost = 10.min(challenger.boonbucks);
             ctx.send(
                 CreateReply::default()
                     .embed(
                         PvP::prepare_embed()
                             .description(format!(
-                                "Byers wiped the floor with {}! They will need to rest for at least 10 minutes! Additionally, Byers took your lunch money of 10 Boondollars!",
-                                ctx.author()
+                                "Byers wiped the floor with {}! They will need to rest for at least 10 minutes! Additionally, Byers took your lunch money of {} Boondollars!",
+                                ctx.author(),
+                                cost,
                             ))
                     )
             )
             .await?;
             set_cooldown(&data.redis_pool, challenger_key, 10 * 60).await?;
 
-            challenger.boonbucks -= 10.min(challenger.boonbucks);
-            server_config.slot_jackpot += 10.min(challenger.boonbucks);
+            let new_boonbucks = challenger.boonbucks - cost;
+            let new_jackpot = server_config.slot_jackpot + cost;
+            challenger
+                .update(
+                    judeharley::entities::users::ActiveModel {
+                        boonbucks: Set(new_boonbucks as i32),
+                        ..Default::default()
+                    },
+                    &data.db,
+                )
+                .await?;
+            server_config
+                .update(
+                    judeharley::entities::server_config::ActiveModel {
+                        slot_jackpot: Set(new_jackpot),
+                        ..Default::default()
+                    },
+                    &data.db,
+                )
+                .await?;
         } else {
             ctx.send(
                 CreateReply::default()
@@ -111,12 +130,26 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
             .await?;
             set_cooldown(&data.redis_pool, challenger_key, 5 * 60).await?;
 
-            challenged.boonbucks += server_config.slot_jackpot;
-            server_config.slot_jackpot = 10;
+            let new_boonbucks = challenger.boonbucks + server_config.slot_jackpot;
+            challenger
+                .update(
+                    judeharley::entities::users::ActiveModel {
+                        boonbucks: Set(new_boonbucks as i32),
+                        ..Default::default()
+                    },
+                    &data.db,
+                )
+                .await?;
+            server_config
+                .update(
+                    judeharley::entities::server_config::ActiveModel {
+                        slot_jackpot: Set(10),
+                        ..Default::default()
+                    },
+                    &data.db,
+                )
+                .await?;
         }
-
-        challenger.update(&data.db).await?;
-        server_config.update(&data.db).await?;
 
         return Ok(());
     }
@@ -248,10 +281,28 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
 
     match result {
         PvPResult::Player1 => {
-            challenger.boonbucks += 10;
-            challenged.boonbucks -= 10;
-            challenger.update(&data.db).await?;
-            challenged.update(&data.db).await?;
+            let challenger_boonbucks = challenger.boonbucks + 10;
+            let challenged_boonbucks = challenged.boonbucks - 10;
+
+            challenger
+                .update(
+                    judeharley::entities::users::ActiveModel {
+                        boonbucks: Set(challenger_boonbucks as i32),
+                        ..Default::default()
+                    },
+                    &data.db,
+                )
+                .await?;
+
+            challenged
+                .update(
+                    judeharley::entities::users::ActiveModel {
+                        boonbucks: Set(challenged_boonbucks as i32),
+                        ..Default::default()
+                    },
+                    &data.db,
+                )
+                .await?;
 
             handle
                 .edit(
@@ -264,10 +315,28 @@ async fn pvp_action(ctx: ApplicationContext<'_>, user: User) -> Result<(), Error
                 .await?;
         }
         PvPResult::Player2 => {
-            challenged.boonbucks += 10;
-            challenger.boonbucks -= 10;
-            challenged.update(&data.db).await?;
-            challenger.update(&data.db).await?;
+            let challenger_boonbucks = challenger.boonbucks - 10;
+            let challenged_boonbucks = challenged.boonbucks + 10;
+
+            challenger
+                .update(
+                    judeharley::entities::users::ActiveModel {
+                        boonbucks: Set(challenger_boonbucks as i32),
+                        ..Default::default()
+                    },
+                    &data.db,
+                )
+                .await?;
+
+            challenged
+                .update(
+                    judeharley::entities::users::ActiveModel {
+                        boonbucks: Set(challenged_boonbucks as i32),
+                        ..Default::default()
+                    },
+                    &data.db,
+                )
+                .await?;
 
             handle
                 .edit(
