@@ -56,17 +56,16 @@ impl UserMessageHandlerExt for Users {
                     time_diff.num_seconds()
                 );
 
-                Some(
-                    self.watched_time + time_diff.num_seconds(),
-                )
+                self.watched_time + time_diff.num_seconds()
             } else {
-                None
+                info!("User {} sent a message more than 15 minutes ago, only adding 15 minutes to their watched time", self.id);
+                self.watched_time + 15 * 60
             };
 
             self.update(
                 judeharley::entities::users::ActiveModel {
                     last_message_sent: last_message_sent.map_or(ActiveValue::not_set(), |t| Set(Some(t))),
-                    watched_time: watched_time.map_or(ActiveValue::not_set(), Set),
+                    watched_time: Set(watched_time),
                     ..Default::default()
                 },
                 db,
